@@ -12,8 +12,6 @@ local appBindings = {
 	tt = "iTerm",
 }
 
-hs.alert("hello from appSwitcher")
-
 local sequence = ""
 local isCapsActive = false
 
@@ -34,6 +32,8 @@ local function handler(event)
 	local code = event:getKeyCode()
 	local flags = event:getFlags()
 	local char = event:getCharacters()
+
+	hs.alert("hello from appSwitcher")
 
 	-- CapsLock key down
 	if code == 57 and event:getType() == eventTypes.keyDown then
