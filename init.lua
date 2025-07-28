@@ -1,3 +1,5 @@
+require("appSwitcher")
+
 local sequenceTimeout = 0.15 -- Time in seconds for the second tap to register (250 milliseconds)
 local sequenceTimeoutTwo = 0.30
 
@@ -9,7 +11,113 @@ local sequence_last_cmd_period_press_time = 0 -- For End (cmd + .)
 
 local inputBuffer = ""
 local lastKeyTime = 0
-local timeout = 1
+-- If you type slowly, inputBuffer resets. You might want to increase this to 1.5 or even 2.0
+-- Make the typing of "br" more forgiving
+local timeout = 2
+local leaderActive = false
+local leaderTimeoutSecond = 2.0
+local leaderTimer = nil
+
+local sequence = ""
+local inLauncherMode = false
+local launcherTimer = nil
+local launcherTimeout = 1.0
+
+local appShortcuts = {
+	br = "Brave Browser",
+	ch = "Google Chrome",
+	vs = "Visual Studio Code",
+	it = "ITerm",
+	ds = "Discord",
+}
+
+local keyInterceptor = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+	if not inLauncherMode then
+		return false
+	end
+
+	local key = event:getCharacters():lower()
+	if #key ~= 1 then
+		return true
+	end -- Ignore non-character keys
+
+	sequence = sequence .. key
+
+	if #sequence == 2 then
+		local app = appShortcuts[sequence]
+		if app then
+			hs.application.launchOrFocus(app)
+		end
+		exitLauncherMode()
+	else
+		resetLauncherTimer()
+	end
+
+	return true -- Suppress key from reaching apps
+end)
+
+-- Detect Caps Lock tap
+local capsWatcher = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, function(event)
+	if event:getKeyCode() == hs.keycodes.map["capslock"] then
+		if not inLauncherMode then
+			enterLauncherMode()
+		end
+	end
+	return false
+end)
+
+function enterLauncherMode()
+	inLauncherMode = true
+	sequence = ""
+	keyInterceptor:start()
+	resetLauncherTimer()
+	hs.alert.show("Launcher Mode")
+end
+
+function exitLauncherMode()
+	inLauncherMode = false
+	sequence = ""
+	keyInterceptor:stop()
+	if launcherTimer then
+		launcherTimer:stop()
+		launcherTimer = nil
+	end
+end
+
+function resetLauncherTimer()
+	if launcherTimer then
+		launcherTimer:stop()
+	end
+	launcherTimer = hs.timer.doAfter(launcherTimeout, function()
+		exitLauncherMode()
+	end)
+end
+
+capsWatcher:start()
+
+local leaderTap = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, function(event)
+	local flags = event:getFlags()
+	local keycode = event:getKeyCode()
+
+	if keycode == hs.keycodes.map["capslock"] and not flags["capslock"] then
+		-- Caps Lock released
+		leaderActive = true
+
+		if leaderTimer then
+			leaderTimer:stop()
+		end
+
+		leaderTimer = hs.timer.doAfter(leaderTimeoutSecond, function()
+			leaderActive = false
+		end)
+
+		return true
+	end
+
+	return false
+end)
+
+leaderTap:start()
 
 -- Function to active or launch an app
 function activateApp(appName)
@@ -25,6 +133,10 @@ local appTriggers = {
 }
 
 local keyTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+	if not leaderActive then
+		return false
+	end
+
 	local char = event:getCharacters()
 	local currentTime = hs.timer.secondsSinceEpoch()
 
@@ -42,6 +154,7 @@ local keyTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(eve
 		if inputBuffer == trigger then
 			activateApp(appName)
 			inputBuffer = "" -- Reset buffer after match
+			leaderActive = false
 			return true
 		end
 	end
@@ -54,12 +167,8 @@ local keyTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(eve
 	return false
 end)
 
--- hs.alert.show("App switcher active")
-
 -- Start the event tap
 keyTap:start()
-
-hs.notify.new({ title = "Hammerspoon", informativeText = "App switcher config loaded" }):send()
 
 -- Helper to check if Shift is pressed
 local function isShiftPressed()
@@ -334,7 +443,10 @@ end
 
 local chatGPTWatcher = hs.application.watcher.new(function(appName, eventType, appObject)
 	if appName == "ChatGPT" and eventType == hs.application.watcher.launched then
-		hs.timer.doAfter(1, positionChatGPTWindow)
+		-- hs.timer.doAfter(1, positionChatGPTWindow)
+		hs.timer.waitUntil(function()
+			return hs.application.get("ChatGPT") ~= nil
+		end, positionChatGPTWindow)
 	end
 end)
 chatGPTWatcher:start()
@@ -393,21 +505,12 @@ hs.timer.doEvery(60, function()
 	keyTap:start()
 end)
 
-hs.alert.show("KeyTap restarted")
-
-hs.alert.show("Starting key logger...")
-
-hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-	local code = event:getKeyCode()
-	local char = event:getCharacters()
-	print("Key code:", code, "Char:", char)
-	hs.alert.show("Key: " .. tostring(char) .. " (" .. tostring(code) .. ")")
-end)
-
+-- For moving cursor to the windon where that we just opened using keyTap
 function focusAppAndMoveCursor(bundleId, position)
 	local app = hs.application.get(bundleId)
 	if app then
-		app:active()
+		-- app:active()
+		app:activate()
 		hs.timer.doAfter(0.3, function()
 			local win = app:mainWindow()
 			if win and win:isStandard() and win:isVisible() and win:isFocused() then
