@@ -1,5 +1,6 @@
 ---@diagnostic disable-next-line: undefined-global
 local hs = hs
+local hotkeyGroups = {}
 
 local sequenceTimeout = 0.15 -- Time in seconds for the second tap to register (250 milliseconds)
 local sequenceTimeoutTwo = 0.30
@@ -9,167 +10,6 @@ local sequence_last_cmd_j_press_time = 0
 local sequence_last_cmd_l_press_time = 0
 local sequence_last_cmd_slash_press_time = 0 -- For Home (cmd + /)
 local sequence_last_cmd_period_press_time = 0 -- For End (cmd + .)
-
-local inputBuffer = ""
-local lastKeyTime = 0
--- If you type slowly, inputBuffer resets. You might want to increase this to 1.5 or even 2.0
--- Make the typing of "br" more forgiving
-local timeout = 2
-local leaderActive = false
-local leaderTimeoutSecond = 2.0
-local leaderTimer = nil
-
-local sequence = ""
-local inLauncherMode = false
-local launcherTimer = nil
-local launcherTimeout = 1.0
-
-local appShortcuts = {
-	br = "Brave Browser",
-	ch = "Google Chrome",
-	vs = "Visual Studio Code",
-	it = "ITerm",
-	ds = "Discord",
-}
-
-local keyInterceptor = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-	if not inLauncherMode then
-		return false
-	end
-
-	local key = event:getCharacters():lower()
-	if #key ~= 1 then
-		return true
-	end -- Ignore non-character keys
-
-	sequence = sequence .. key
-
-	if #sequence == 2 then
-		local app = appShortcuts[sequence]
-		if app then
-			hs.application.launchOrFocus(app)
-		end
-		exitLauncherMode()
-	else
-		resetLauncherTimer()
-	end
-
-	return true -- Suppress key from reaching apps
-end)
-
--- Detect Caps Lock tap
-local capsWatcher = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, function(event)
-	if event:getKeyCode() == hs.keycodes.map["capslock"] then
-		if not inLauncherMode then
-			enterLauncherMode()
-		end
-	end
-	return false
-end)
-
-function enterLauncherMode()
-	inLauncherMode = true
-	sequence = ""
-	keyInterceptor:start()
-	resetLauncherTimer()
-	hs.alert.show("Launcher Mode")
-end
-
-function exitLauncherMode()
-	inLauncherMode = false
-	sequence = ""
-	keyInterceptor:stop()
-	if launcherTimer then
-		launcherTimer:stop()
-		launcherTimer = nil
-	end
-end
-
-function resetLauncherTimer()
-	if launcherTimer then
-		launcherTimer:stop()
-	end
-	launcherTimer = hs.timer.doAfter(launcherTimeout, function()
-		exitLauncherMode()
-	end)
-end
-
-capsWatcher:start()
-
-local leaderTap = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, function(event)
-	local flags = event:getFlags()
-	local keycode = event:getKeyCode()
-
-	if keycode == hs.keycodes.map["capslock"] and not flags["capslock"] then
-		-- Caps Lock released
-		leaderActive = true
-
-		if leaderTimer then
-			leaderTimer:stop()
-		end
-
-		leaderTimer = hs.timer.doAfter(leaderTimeoutSecond, function()
-			leaderActive = false
-		end)
-
-		return true
-	end
-
-	return false
-end)
-
-leaderTap:start()
-
--- Function to active or launch an app
-function activateApp(appName)
-	hs.application.launchOrFocus(appName)
-end
-
-local appTriggers = {
-	ch = "Google Chrome",
-	br = "Brave Browser",
-	vs = "Visual Studio Code",
-	it = "iterm",
-	ds = "discord",
-}
-
-local keyTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-	if not leaderActive then
-		return false
-	end
-
-	local char = event:getCharacters()
-	local currentTime = hs.timer.secondsSinceEpoch()
-
-	-- Reset buffer if too much time has pressed
-	if currentTime - lastKeyTime > timeout then
-		inputBuffer = ""
-	end
-
-	-- Append the new character to the buffer
-	inputBuffer = inputBuffer .. char
-	lastKeyTime = currentTime
-
-	-- Check if the buffer matches any trigger
-	for trigger, appName in pairs(appTriggers) do
-		if inputBuffer == trigger then
-			activateApp(appName)
-			inputBuffer = "" -- Reset buffer after match
-			leaderActive = false
-			return true
-		end
-	end
-
-	-- Reset buffer if it gets too long
-	if #inputBuffer > 2 then
-		inputBuffer = char
-	end
-
-	return false
-end)
-
--- Start the event tap
-keyTap:start()
 
 -- Helper to check if Shift is pressed
 local function isShiftPressed()
@@ -203,7 +43,6 @@ KEYMAP = {
 }
 
 local scrollAmount = 5
-hotkeyGroups = {}
 
 -- Scroll Up → Cmd + u
 local scrollUp = hs.hotkey.new(
@@ -460,12 +299,13 @@ local function moveFocusedWindow(xAlign, yAlign)
 
 	local screen = win:screen()
 	local screenFrame = screen:frame()
+	local size = win:size()
 
-	local width, height = 500, 600
-	local x = screenFrame.x + (screenFrame.w - width) * xAlign
-	local y = screenFrame.y + (screenFrame.h - height) * yAlign
+	-- local width, height = 500, 600
+	local x = screenFrame.x + (screenFrame.w - size.w) * xAlign
+	local y = screenFrame.y + (screenFrame.h - size.h) * yAlign
 
-	win:setFrame(hs.geometry.rect(x, y, width, height))
+	win:setFrame(hs.geometry.rect(x, y, size.w, size.h))
 end
 
 -- Bottom Left
@@ -492,26 +332,3 @@ end)
 hs.hotkey.bind({ "cmd", "shift" }, "k", function()
 	moveFocusedWindow(0.5, 0.5)
 end)
-
--- Periodically restart keyTap to keep it alive
-hs.timer.doEvery(60, function()
-	if keyTap:isEnabled() then
-		keyTap:stop()
-	end
-	keyTap:start()
-end)
-
--- For moving cursor to the windon where that we just opened using keyTap
-function focusAppAndMoveCursor(bundleId, position)
-	local app = hs.application.get(bundleId)
-	if app then
-		-- app:active()
-		app:activate()
-		hs.timer.doAfter(0.3, function()
-			local win = app:mainWindow()
-			if win and win:isStandard() and win:isVisible() and win:isFocused() then
-				hs.mouse.absolutePosition(position)
-			end
-		end)
-	end
-end
