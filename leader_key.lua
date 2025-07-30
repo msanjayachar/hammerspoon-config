@@ -119,7 +119,7 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 		end
 		return false
 	end
-	
+
 	if leaderState then
 		-- Reset timer on every keystroke
 		if leaderTimer then
