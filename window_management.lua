@@ -1,6 +1,7 @@
 --- Window management module for Hammerspoon
 local windowManagement = {}
 
+---@diagnostic disable-next-line: undefined-global
 local hs = hs
 
 -- Move focused window to specific screen position
@@ -46,4 +47,3 @@ function windowManagement.init()
 end
 
 return windowManagement
-

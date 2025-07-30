@@ -1,6 +1,7 @@
 --- Key mappings module for Hammerspoon
 local keyMappings = {}
 
+---@diagnostic disable-next-line: undefined-global
 local hs = hs
 local hotkeyGroups = {}
 
@@ -203,4 +204,3 @@ function keyMappings.init()
 end
 
 return keyMappings
-
