@@ -34,39 +34,44 @@ end
 local function moveCursorToCenter(win)
 	local frame = win:frame()
 	local centerPoint = hs.geometry.point(frame.x + frame.w / 2 - 65, frame.y + frame.h / 2)
+	-- hs.mouse.setAbsolutePosition(centerPoint)
 	hs.mouse.absolutePosition(centerPoint)
 end
 
 -- Function to perform application action or window switching
 local function performAction(sequence, windowIndex)
-	local appName = appMappings[sequence]
-	if not appName then
-		hs.alert.show("Unknown sequence: " .. sequence)
-		return
-	end
-
 	if windowIndex then
-		-- Window switching for the specified application
-		local app = hs.application.get(appName)
+		-- Window switching for the current application
+		local app = hs.application.frontmostApplication()
 		if app then
+			-- local windows = app:allWindows()
 			local windows = hs.fnutils.filter(app:allWindows(), function(win)
+				-- return win:isStandard() and win:isVisible()
 				return win:isStandard()
 			end)
-			-- fallback: if nothing matched, grab all windows (minimized etc.)
+			-- fallbaack: if nothing matched, grab all windows (minimized etc.)
 			if #windows == 0 then
 				windows = app:allWindows()
 			end
 
-			if #windows >= windowIndex then
-				local win = windows[windowIndex]
+			-- Allow default to first window if index is not passed
+			local index = windowIndex or 1
+
+			if #windows >= index then
+				local win = windows[index]
 				win:focus()
 				moveCursorToCenter(win)
 			else
-				hs.alert.show("Window " .. windowIndex .. " not found", 0.8)
+				hs.alert.show("Window " .. index .. " not found", 0.8)
 			end
 		end
 	else
 		-- Application launching or focusing
+		local appName = appMappings[sequence]
+		if not appName then
+			hs.alert.show("Unknown sequence: " .. sequence)
+			return
+		end
 		local app = hs.application.get(appName)
 		if not app then
 			hs.application.launchOrFocus(appName)
@@ -77,7 +82,9 @@ local function performAction(sequence, windowIndex)
 				end
 			end)
 		else
+			-- local windows = app:allWindows()
 			local windows = hs.fnutils.filter(app:allWindows(), function(win)
+				-- return win:isStandard() and win:isVisible()
 				return win:isStandard()
 			end)
 			if #windows == 0 then
@@ -90,24 +97,30 @@ local function performAction(sequence, windowIndex)
 				end)
 			else
 				app:activate()
-				hs.timer.doAfter(0.1, function()
-					local win = hs.window.focusedWindow()
-					if win then
-						moveCursorToCenter(win)
-					end
-				end)
+				local win = hs.window.focusedWindow()
+				if win then
+					moveCursorToCenter(win)
+				end
 			end
 		end
 	end
 end
 
+hs.hotkey.bind({}, "f18", function()
+	hs.alert.show("F18 triggered")
+end)
+
 -- Event tap to handle key presses
 local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
-	local keyCode = event:getKeyCode()
-	local key = event:getCharacters(true)
+	-- local keyCode = event:getKeyCode()
+	-- local key = hs.keycodes.map[keyCode]
+	local key = event:getCharacters(true) -- Handles upper/lowercase properly
+
+	print("key pressed:", key)
 
 	-- Start leader sequence
 	if not leaderState then
+		local keyCode = event:getKeyCode()
 		if hs.keycodes.map[keyCode] == "f18" then
 			leaderState = true
 			leaderSequence = ""
@@ -115,11 +128,10 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 				leaderTimer:stop()
 			end
 			leaderTimer = hs.timer.doAfter(sequenceTimeout, resetLeader)
+			print("Leader mode triggered")
 			return true
 		end
-		return false
 	end
-	
 	if leaderState then
 		-- Reset timer on every keystroke
 		if leaderTimer then
@@ -127,40 +139,40 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 		end
 		leaderTimer = hs.timer.doAfter(sequenceTimeout, resetLeader)
 
-		if key and key:match("%a") then
+		if key:match("%a") then
 			leaderSequence = leaderSequence .. key:lower()
+			print("Leader sequence:", leaderSequence)
 
 			if #leaderSequence == 2 then
+				-- performAction(leaderSequence)
+				-- resetLeader()
+				-- Wait for number input before acting
 				local appName = appMappings[leaderSequence]
 				if appName then
 					local app = hs.application.get(appName)
 					if app then
+						-- local winCount = #app:allWindows()
 						local windows = hs.fnutils.filter(app:allWindows(), function(win)
 							return win:isStandard()
 						end)
 						local winCount = #windows
 
+						hs.alert.show(appName .. ": " .. winCount .. " window(s)")
+
 						if winCount == 1 then
 							performAction(leaderSequence, 1)
 							resetLeader()
-						elseif winCount > 1 then
-							hs.alert.show(appName .. ": " .. winCount .. " window(s) - press number", 0.8)
-						else
-							performAction(leaderSequence)
-							resetLeader()
 						end
 					else
-						performAction(leaderSequence)
-						resetLeader()
+						hs.alert.show(appName .. " not running")
 					end
 				else
-					hs.alert.show("Unknown app: " .. leaderSequence, 0.8)
-					resetLeader()
+					hs.alert.show("Unknown app: " .. leaderSequence)
 				end
 				return true
 			end
 			return true
-		elseif key and key:match("%d") then
+		elseif key:match("%d") then
 			if #leaderSequence == 2 then
 				performAction(leaderSequence, tonumber(key))
 				resetLeader()
