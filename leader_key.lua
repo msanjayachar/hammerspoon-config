@@ -4,16 +4,37 @@ local hs = hs
 
 local leaderKeys = {}
 
+--[[
+IN PROGRESS:
+
+- [x] Unable to launch arc browser
+- [x] Unable to launch chatgpt application
+
+- [x] Can't bring chatgpt back up from minimized as well
+- [x] Can't bring arc back up from minimized as well
+
+At the same time can switch between these two wthen they are already launched
+
+QUESTIONS:
+? How is the other applications being launched
+
+
+HYPOTHESIS:
+
+
+
+]]
+
 local appMappings = {
-	["c"] = "Google Chrome",
-	["b"] = "Brave Browser", 
-	["i"] = "iTerm",
-	["a"] = "Arc",
-	["d"] = "Discord",
-	["v"] = "Visual Studio Code",
-	["g"] = "ChatGPT",
-	["o"] = "Obsidian",
-	["k"] = "Docker",
+	["c"] = { name = "Google Chrome", bundleID = "com.google.Chrome" },
+	["b"] = { name = "Brave Browser", bundleID = "com.brave.Browser" },
+	["i"] = { name = "iTerm", bundleID = "com.googlecode.iterm2" },
+	["a"] = { name = "Arc", bundleID = "company.thebrowser.Browser" },
+	["d"] = { name = "Discord", bundleID = "com.hnc.Discord" },
+	["v"] = { name = "Visual Studio Code", bundleID = "com.microsoft.VSCode" },
+	["g"] = { name = "ChatGPT", bundleID = "com.openai.chat" },
+	["o"] = { name = "Obsidian", bundleID = "md.obsidian" },
+	["k"] = { name = "Docker", bundleID = "com.docker.docker" },
 }
 
 local leaderState = false
@@ -123,44 +144,63 @@ end
 
 -- Function to perform application action or window switching
 local function performAction(sequence)
-	local appName = appMappings[sequence]
-	if not appName then
+	local appEntry = appMappings[sequence]
+  if not appEntry then
 		hs.alert.show("Unknown sequence: " .. sequence)
 		return
 	end
 
-	-- Log space and application info
-	logSpaceInfo()
+  local appName = appEntry.name
+  local bundleID = appEntry.bundleID
+  print("appName: ", appName)
 
+  -- don't think this is the best way to get the currentApp 
 	local currentApp = hs.application.frontmostApplication()
-	local targetApp = hs.application.get(appName)
-	if not targetApp then
-		hs.application.launchOrFocus(appName)
-		hs.timer.doAfter(0.5, function()
-			local win = hs.window.focusedWindow()
-			if win then
-				moveCursorToCenter(win)
-			end
-		end)
-		return
-	end
+	local targetApp = hs.application.get(bundleID)
 
-	-- If we're already in the target app, cycle to next window
-	if currentApp and currentApp:bundleID() == targetApp:bundleID() then
-		-- Collect windows from allWindows()
-		local allWindows = targetApp:allWindows()
-		local validWindows = {}
-		for _, win in ipairs(allWindows) do
-			local notMinimized = not win:isMinimized()
-			local hasValidFrame = win:frame().w > 0 and win:frame().h > 0
-			if notMinimized and hasValidFrame then
-				table.insert(validWindows, win)
-				local spaceID = getWindowSpace(win) or "unknown"
-				print("DEBUG: Found window '" .. win:title() .. "' (ID: " .. win:id() .. ", Space: " .. spaceID .. ", Minimized: " .. tostring(win:isMinimized()) .. ", Visible: " .. tostring(win:isVisible()) .. ")")
-			else
-				print("DEBUG: Skipped window '" .. win:title() .. "' (ID: " .. win:id() .. ", Minimized: " .. tostring(win:isMinimized()) .. ", Visible: " .. tostring(win:isVisible()) .. ", notMinimized: " .. tostring(notMinimized) .. ", hasValidFrame: " .. tostring(hasValidFrame) .. ")")
-			end
-		end
+  print("currentApp: ", currentApp)
+  print("targetApp: ", targetApp)
+
+  -- If we're already in the target app, cycle to next window
+	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
+		local windows = targetApp:allWindows()
+		
+		-- Filter for valid windows and sort by ID for consistent ordering
+		-- windows = hs.fnutils.filter(windows, function(win)
+		-- 	return win:title() ~= "" and not win:isMinimized()
+		-- end)
+
+    -- First, try to unminimize if all windows are minimized
+    local allMinimized = hs.fnutils.every(windows, function(win)
+      return win:isMinimized()
+    end)
+
+    if allMinimized and #windows > 0 then
+      print("All windows minimized, unminimizing first window")
+      local win = windows[1]
+      win:unminimize()
+      win:focus()
+      targetApp:activate()
+      hs.timer.doAfter(0.1, function()
+        moveCursorToCenter(win)
+      end)
+      return
+      -- windows[1]:unminimize()
+      -- windows[1]:focus()
+      -- targetApp:activate()
+      -- moveCursorToCenter(windows[1])
+      -- return
+    end
+
+    windows = hs.fnutils.filter(windows, function(win)
+      return win:title() ~= "" and not win:isMinimized()
+    end)
+
+  -- Log window count and details
+		print("Found " .. #windows .. " windows for " .. appName)
+		for i, win in ipairs(windows) do
+			print("  Window " .. i .. ": " .. win:title() .. " (ID: " .. win:id() .. ")")
+		end    
 
 		-- Sort by window ID for consistent ordering
 		table.sort(validWindows, function(a, b) return a:id() < b:id() end)
@@ -212,14 +252,56 @@ local function performAction(sequence)
 			print("DEBUG: Only one or no valid windows found, no cycling needed")
 		end
 	else
-		-- Switch to the app
-		targetApp:activate()
-		hs.timer.doAfter(0.3, function()
-			local win = hs.window.focusedWindow()
-			if win then
-				moveCursorToCenter(win)
-			end
-		end)
+		-- Switch to the app (will focus last focused window)
+		if not targetApp then
+			-- hs.application.launchOrFocus(appName)
+      hs.application.launchOrFocusByBundleID(bundleID)
+
+			hs.timer.doAfter(0.5, function()
+        local launchedApp = hs.application.get(bundleID)
+        if launchedApp and launchedApp:isRunning() then
+          launchedApp:activate()  
+          
+          local win = hs.window.focusedWindow()
+          if win then
+            moveCursorToCenter(win)
+          end
+        else
+          hs.alert.show("Failed to launch: " .. appName)
+        end
+			end)
+		else
+      local windows = targetApp:allWindows()
+      if #windows == 0 then
+        hs.alert.show(appName .. " has no windows")
+        return
+      end
+
+      -- Try to find a non-minimized window, or fallback to the first one
+      table.sort(windows, function(a, b) return a:id() < b:id() end)
+      local targetWindow = hs.fnutils.find(windows, function(win)
+        return not win:isMinimized() and win:title() ~= ""
+      end) or windows[1]
+
+      -- Unminimize if necessary
+      if targetWindow:isMinimized() then
+        targetWindow:unminimize()
+      end
+
+      targetApp:activate()
+      targetWindow:focus()
+
+      hs.timer.doAfter(0.1, function()
+        moveCursorToCenter(targetWindow) 
+      end)
+		-- targetApp:activate()
+			-- hs.timer.doAfter(0.1, function()
+			-- 	local win = hs.window.focusedWindow()
+			-- 	if win then
+			-- 		moveCursorToCenter(win)
+			-- 	end
+			-- end)
+		end
 	end
 end
 
