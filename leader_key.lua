@@ -5,15 +5,15 @@ local hs = hs
 local leaderKeys = {}
 
 local appMappings = {
-	["ch"] = "Google Chrome",
-	["br"] = "Brave Browser",
-	["it"] = "iTerm",
-	["ar"] = "Arc",
-	["ds"] = "Discord",
-	["vs"] = "Visual Studio Code",
-	["gp"] = "ChatGPT",
-	["ob"] = "Obsidian",
-	["dk"] = "Docker",
+	["c"] = "Google Chrome",
+	["b"] = "Brave Browser", 
+	["i"] = "iTerm",
+	["a"] = "Arc",
+	["d"] = "Discord",
+	["v"] = "Visual Studio Code",
+	["g"] = "ChatGPT",
+	["o"] = "Obsidian",
+	["k"] = "Docker",
 }
 
 local leaderState = false
@@ -38,37 +38,62 @@ local function moveCursorToCenter(win)
 end
 
 -- Function to perform application action or window switching
-local function performAction(sequence, windowIndex)
+local function performAction(sequence)
 	local appName = appMappings[sequence]
 	if not appName then
 		hs.alert.show("Unknown sequence: " .. sequence)
 		return
 	end
 
-	if windowIndex then
-		-- Window switching for the specified application
-		local app = hs.application.get(appName)
-		if app then
-			local windows = hs.fnutils.filter(app:allWindows(), function(win)
-				return win:isStandard()
-			end)
-			-- fallback: if nothing matched, grab all windows (minimized etc.)
-			if #windows == 0 then
-				windows = app:allWindows()
-			end
+	local currentApp = hs.application.frontmostApplication()
+	local targetApp = hs.application.get(appName)
+	
+	-- If we're already in the target app, cycle to next window
+	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
+		local windows = targetApp:allWindows()
+		
+		-- Filter for valid windows and sort by ID for consistent ordering
+		windows = hs.fnutils.filter(windows, function(win)
+			return win:title() ~= "" and not win:isMinimized()
+		end)
+	
+  -- Log window count and details
+		print("Found " .. #windows .. " windows for " .. appName)
+		for i, win in ipairs(windows) do
+			print("  Window " .. i .. ": " .. win:title() .. " (ID: " .. win:id() .. ")")
+		end    
 
-			if #windows >= windowIndex then
-				local win = windows[windowIndex]
-				win:focus()
-				moveCursorToCenter(win)
-			else
-				hs.alert.show("Window " .. windowIndex .. " not found", 0.8)
+		-- Sort by window ID for consistent ordering
+		table.sort(windows, function(a, b) return a:id() < b:id() end)
+		
+		if #windows > 1 then
+			local currentWin = hs.window.focusedWindow()
+			local currentIndex = 1
+			
+			-- Find current window index
+			for i, win in ipairs(windows) do
+				if win:id() == currentWin:id() then
+					currentIndex = i
+					break
+				end
 			end
+			
+			-- Get next window (cycle back to 1 if at end)
+			local nextIndex = currentIndex == #windows and 1 or currentIndex + 1
+			local nextWin = windows[nextIndex]
+			
+			-- Force focus and bring to front
+			nextWin:becomeMain()
+			nextWin:focus()
+			targetApp:activate()
+			
+			hs.timer.doAfter(0.1, function()
+				moveCursorToCenter(nextWin)
+			end)
 		end
 	else
-		-- Application launching or focusing
-		local app = hs.application.get(appName)
-		if not app then
+		-- Switch to the app (will focus last focused window)
+		if not targetApp then
 			hs.application.launchOrFocus(appName)
 			hs.timer.doAfter(0.5, function()
 				local win = hs.window.focusedWindow()
@@ -77,26 +102,13 @@ local function performAction(sequence, windowIndex)
 				end
 			end)
 		else
-			local windows = hs.fnutils.filter(app:allWindows(), function(win)
-				return win:isStandard()
+			targetApp:activate()
+			hs.timer.doAfter(0.1, function()
+				local win = hs.window.focusedWindow()
+				if win then
+					moveCursorToCenter(win)
+				end
 			end)
-			if #windows == 0 then
-				hs.application.launchOrFocus(appName)
-				hs.timer.doAfter(0.5, function()
-					local win = hs.window.focusedWindow()
-					if win then
-						moveCursorToCenter(win)
-					end
-				end)
-			else
-				app:activate()
-				hs.timer.doAfter(0.1, function()
-					local win = hs.window.focusedWindow()
-					if win then
-						moveCursorToCenter(win)
-					end
-				end)
-			end
 		end
 	end
 end
@@ -106,6 +118,7 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 	local keyCode = event:getKeyCode()
 	local key = event:getCharacters(true)
 
+ 
 	-- Start leader sequence
 	if not leaderState then
 		if hs.keycodes.map[keyCode] == "f18" then
@@ -119,7 +132,7 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 		end
 		return false
 	end
-
+	
 	if leaderState then
 		-- Reset timer on every keystroke
 		if leaderTimer then
@@ -130,42 +143,12 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 		if key and key:match("%a") then
 			leaderSequence = leaderSequence .. key:lower()
 
-			if #leaderSequence == 2 then
-				local appName = appMappings[leaderSequence]
-				if appName then
-					local app = hs.application.get(appName)
-					if app then
-						local windows = hs.fnutils.filter(app:allWindows(), function(win)
-							return win:isStandard()
-						end)
-						local winCount = #windows
-
-						if winCount == 1 then
-							performAction(leaderSequence, 1)
-							resetLeader()
-						elseif winCount > 1 then
-							hs.alert.show(appName .. ": " .. winCount .. " window(s) - press number", 0.8)
-						else
-							performAction(leaderSequence)
-							resetLeader()
-						end
-					else
-						performAction(leaderSequence)
-						resetLeader()
-					end
-				else
-					hs.alert.show("Unknown app: " .. leaderSequence, 0.8)
-					resetLeader()
-				end
-				return true
-			end
-			return true
-		elseif key and key:match("%d") then
-			if #leaderSequence == 2 then
-				performAction(leaderSequence, tonumber(key))
+			if #leaderSequence == 1 then
+				performAction(leaderSequence)
 				resetLeader()
 				return true
 			end
+			return true
 		else
 			resetLeader()
 			return false
