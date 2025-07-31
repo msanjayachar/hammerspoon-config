@@ -93,9 +93,8 @@ local function logSpaceInfo()
 		end
 	end
 
-	-- Fallback: Check all windows to catch any missed by spaces API
+	-- Fallback: Check all windows
 	local allWindows = hs.window.allWindows()
-  hs.alert.show("allWindows: ", allWindows)
 	for _, win in ipairs(allWindows) do
 		local appName = win:application() and win:application():name()
 		if appName then
@@ -148,13 +147,18 @@ local function performAction(sequence)
 
 	-- If we're already in the target app, cycle to next window
 	if currentApp and currentApp:bundleID() == targetApp:bundleID() then
-		-- Collect windows from allWindows() to ensure cross-space detection
+		-- Collect windows from allWindows()
 		local allWindows = targetApp:allWindows()
-    hs.alert.show("allWindows: ", allWindows)
-    local validWindows = {}
+		local validWindows = {}
 		for _, win in ipairs(allWindows) do
-			if not win:isMinimized() and win:frame().w > 0 and win:frame().h > 0 then
+			local notMinimized = not win:isMinimized()
+			local hasValidFrame = win:frame().w > 0 and win:frame().h > 0
+			if notMinimized and hasValidFrame then
 				table.insert(validWindows, win)
+				local spaceID = getWindowSpace(win) or "unknown"
+				print("DEBUG: Found window '" .. win:title() .. "' (ID: " .. win:id() .. ", Space: " .. spaceID .. ", Minimized: " .. tostring(win:isMinimized()) .. ", Visible: " .. tostring(win:isVisible()) .. ")")
+			else
+				print("DEBUG: Skipped window '" .. win:title() .. "' (ID: " .. win:id() .. ", Minimized: " .. tostring(win:isMinimized()) .. ", Visible: " .. tostring(win:isVisible()) .. ", notMinimized: " .. tostring(notMinimized) .. ", hasValidFrame: " .. tostring(hasValidFrame) .. ")")
 			end
 		end
 
@@ -169,6 +173,8 @@ local function performAction(sequence)
 			for i, win in ipairs(validWindows) do
 				if currentWin and win:id() == currentWin:id() then
 					currentIndex = i
+					local spaceID = getWindowSpace(win) or "unknown"
+					print("DEBUG: Current window '" .. win:title() .. "' (ID: " .. win:id() .. ", Space: " .. spaceID .. ") at index " .. i)
 					break
 				end
 			end
@@ -179,23 +185,31 @@ local function performAction(sequence)
 			if nextWin then
 				local nextSpaceID = getWindowSpace(nextWin)
 				if nextSpaceID then
+					print("DEBUG: Switching to space " .. nextSpaceID .. " for window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
 					hs.spaces.gotoSpace(nextSpaceID)
 					hs.timer.doAfter(0.3, function()
 						nextWin:becomeMain()
 						nextWin:focus()
 						targetApp:activate()
 						moveCursorToCenter(nextWin)
+						print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
 					end)
 				else
 					-- Fallback: focus without space switch
+					print("DEBUG: No space ID for window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. "), focusing without space switch")
 					nextWin:becomeMain()
 					nextWin:focus()
 					targetApp:activate()
 					hs.timer.doAfter(0.1, function()
 						moveCursorToCenter(nextWin)
+						print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
 					end)
 				end
+			else
+				print("DEBUG: No next window found")
 			end
+		else
+			print("DEBUG: Only one or no valid windows found, no cycling needed")
 		end
 	else
 		-- Switch to the app
