@@ -13,15 +13,9 @@ IN PROGRESS:
 - [x] Can't bring chatgpt back up from minimized as well
 - [x] Can't bring arc back up from minimized as well
 
-At the same time can switch between these two wthen they are already launched
-
 QUESTIONS:
-? How is the other applications being launched
-
 
 HYPOTHESIS:
-
-
 
 ]]
 
@@ -165,11 +159,6 @@ local function performAction(sequence)
 	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
 		local windows = targetApp:allWindows()
 		
-		-- Filter for valid windows and sort by ID for consistent ordering
-		-- windows = hs.fnutils.filter(windows, function(win)
-		-- 	return win:title() ~= "" and not win:isMinimized()
-		-- end)
-
     -- First, try to unminimize if all windows are minimized
     local allMinimized = hs.fnutils.every(windows, function(win)
       return win:isMinimized()
@@ -178,23 +167,11 @@ local function performAction(sequence)
     if allMinimized and #windows > 0 then
       print("All windows minimized, unminimizing first window")
       local win = windows[1]
-      win:unminimize()
-      win:focus()
-      targetApp:activate()
       hs.timer.doAfter(0.1, function()
         moveCursorToCenter(win)
       end)
       return
-      -- windows[1]:unminimize()
-      -- windows[1]:focus()
-      -- targetApp:activate()
-      -- moveCursorToCenter(windows[1])
-      -- return
     end
-
-    -- windows = hs.fnutils.filter(windows, function(win)
-    --   return win:title() ~= "" and not win:isMinimized()
-    -- end)
 
     if windows and #windows > 0 then
       table.sort(windows, function(a, b) return a:id() < b:id() end)
@@ -205,9 +182,6 @@ local function performAction(sequence)
 		for i, win in ipairs(windows) do
 			print("  Window " .. i .. ": " .. win:title() .. " (ID: " .. win:id() .. ")")
 		end    
-
-		-- Sort by window ID for consistent ordering
-		-- table.sort(validWindows, function(a, b) return a:id() < b:id() end)
 
     validWindows = hs.fnutils.filter(windows, function(win)
       return win:title() ~= "" and not win:isMinimized() 
@@ -234,8 +208,9 @@ local function performAction(sequence)
 			local nextIndex = currentIndex == #validWindows and 1 or currentIndex + 1
 			local nextWin = validWindows[nextIndex]
 			if nextWin then
+        local currentSpace = hs.spaces.focusedSpace()
 				local nextSpaceID = getWindowSpace(nextWin)
-				if nextSpaceID then
+				if nextSpaceID and nextSpaceID ~= currentSpace then
 					print("DEBUG: Switching to space " .. nextSpaceID .. " for window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
 					hs.spaces.gotoSpace(nextSpaceID)
 					hs.timer.doAfter(0.3, function()
@@ -246,15 +221,23 @@ local function performAction(sequence)
 						print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
 					end)
 				else
-					-- Fallback: focus without space switch
-					print("DEBUG: No space ID for window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. "), focusing without space switch")
-					nextWin:becomeMain()
-					nextWin:focus()
-					targetApp:activate()
-					hs.timer.doAfter(0.1, function()
-						moveCursorToCenter(nextWin)
-						print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
-					end)
+          print("DEBUG: Staying on current space for window '" .. nextWin:title() .. "' (ID: ) " .. nextWin:id() .. ")")
+          nextWin:becomeMain()
+          nextWin:focus()
+          targetApp:activate()
+          hs.timer.doAfter(0.1, function()
+            moveCursorToCenter(nextWin)
+            print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")") 
+          end)
+					-- -- Fallback: focus without space switch
+					-- print("DEBUG: No space ID for window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. "), focusing without space switch")
+					-- nextWin:becomeMain()
+					-- nextWin:focus()
+					-- targetApp:activate()
+					-- hs.timer.doAfter(0.1, function()
+					-- 	moveCursorToCenter(nextWin)
+					-- 	print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
+					-- end)
 				end
 			else
 				print("DEBUG: No next window found")
@@ -305,13 +288,6 @@ local function performAction(sequence)
       hs.timer.doAfter(0.1, function()
         moveCursorToCenter(targetWindow) 
       end)
-		-- targetApp:activate()
-			-- hs.timer.doAfter(0.1, function()
-			-- 	local win = hs.window.focusedWindow()
-			-- 	if win then
-			-- 		moveCursorToCenter(win)
-			-- 	end
-			-- end)
 		end
 	end
 end
