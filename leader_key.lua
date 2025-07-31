@@ -37,6 +37,91 @@ local function moveCursorToCenter(win)
 	hs.mouse.absolutePosition(centerPoint)
 end
 
+-- Function to get space ID for a window
+local function getWindowSpace(win)
+	local screen = win:screen()
+	if not screen then
+		return nil
+	end
+	local screenUUID = screen:getUUID()
+	local spaces = hs.spaces.allSpaces()
+	local spaceList = spaces[screenUUID]
+	if not spaceList then
+		return nil
+	end
+	for _, spaceID in ipairs(spaceList) do
+		local spaceWindows = hs.spaces.windowsForSpace(spaceID)
+		if spaceWindows then
+			for _, winID in ipairs(spaceWindows) do
+				if winID == win:id() then
+					return spaceID
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- Function to log space and application info
+local function logSpaceInfo()
+	local spaces = hs.spaces.allSpaces()
+	if not spaces then
+		return
+	end
+	local totalSpaces = 0
+	for _, spaceList in pairs(spaces) do
+		totalSpaces = totalSpaces + #spaceList
+	end
+	print("Number of spaces: " .. totalSpaces)
+
+	-- Track apps per space
+	local spaceAppMap = {}
+	for screenUUID, spaceList in pairs(spaces) do
+		for _, spaceID in ipairs(spaceList) do
+			spaceAppMap[spaceID] = {}
+			local spaceWindows = hs.spaces.windowsForSpace(spaceID) or {}
+			for _, winID in ipairs(spaceWindows) do
+				local win = hs.window.get(winID)
+				if win and win:application() then
+					local appName = win:application():name()
+					if appName then
+						spaceAppMap[spaceID][appName] = true
+						print("Window in space " .. spaceID .. ": '" .. win:title() .. "' (App: " .. appName .. ", ID: " .. win:id() .. ", Minimized: " .. tostring(win:isMinimized()) .. ", Visible: " .. tostring(win:isVisible()) .. ")")
+					end
+				end
+			end
+		end
+	end
+
+	-- Fallback: Check all windows to catch any missed by spaces API
+	local allWindows = hs.window.allWindows()
+  hs.alert.show("allWindows: ", allWindows)
+	for _, win in ipairs(allWindows) do
+		local appName = win:application() and win:application():name()
+		if appName then
+			local spaceID = getWindowSpace(win)
+			if spaceID and not spaceAppMap[spaceID][appName] then
+				spaceAppMap[spaceID][appName] = true
+				print("Fallback window in space " .. spaceID .. ": '" .. win:title() .. "' (App: " .. appName .. ", ID: " .. win:id() .. ", Minimized: " .. tostring(win:isMinimized()) .. ", Visible: " .. tostring(win:isVisible()) .. ")")
+			end
+		end
+	end
+
+	-- Log app counts and names
+	for screenUUID, spaceList in pairs(spaces) do
+		for _, spaceID in ipairs(spaceList) do
+			local appCount = 0
+			local appList = {}
+			for appName, _ in pairs(spaceAppMap[spaceID] or {}) do
+				appCount = appCount + 1
+				table.insert(appList, appName)
+			end
+			print("Number of applications on space " .. spaceID .. " (screen " .. screenUUID .. "): " .. appCount)
+			print("Applications on space " .. spaceID .. ": " .. (#appList > 0 and table.concat(appList, ", ") or "None"))
+		end
+	end
+end
+
 -- Function to perform application action or window switching
 local function performAction(sequence)
 	local appName = appMappings[sequence]
@@ -45,71 +130,82 @@ local function performAction(sequence)
 		return
 	end
 
+	-- Log space and application info
+	logSpaceInfo()
+
 	local currentApp = hs.application.frontmostApplication()
 	local targetApp = hs.application.get(appName)
-	
-	-- If we're already in the target app, cycle to next window
-	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
-		local windows = targetApp:allWindows()
-		
-		-- Filter for valid windows and sort by ID for consistent ordering
-		windows = hs.fnutils.filter(windows, function(win)
-			return win:title() ~= "" and not win:isMinimized()
+	if not targetApp then
+		hs.application.launchOrFocus(appName)
+		hs.timer.doAfter(0.5, function()
+			local win = hs.window.focusedWindow()
+			if win then
+				moveCursorToCenter(win)
+			end
 		end)
-	
-  -- Log window count and details
-		print("Found " .. #windows .. " windows for " .. appName)
-		for i, win in ipairs(windows) do
-			print("  Window " .. i .. ": " .. win:title() .. " (ID: " .. win:id() .. ")")
-		end    
+		return
+	end
+
+	-- If we're already in the target app, cycle to next window
+	if currentApp and currentApp:bundleID() == targetApp:bundleID() then
+		-- Collect windows from allWindows() to ensure cross-space detection
+		local allWindows = targetApp:allWindows()
+    hs.alert.show("allWindows: ", allWindows)
+    local validWindows = {}
+		for _, win in ipairs(allWindows) do
+			if not win:isMinimized() and win:frame().w > 0 and win:frame().h > 0 then
+				table.insert(validWindows, win)
+			end
+		end
 
 		-- Sort by window ID for consistent ordering
-		table.sort(windows, function(a, b) return a:id() < b:id() end)
-		
-		if #windows > 1 then
+		table.sort(validWindows, function(a, b) return a:id() < b:id() end)
+
+		if #validWindows > 1 then
 			local currentWin = hs.window.focusedWindow()
 			local currentIndex = 1
-			
+
 			-- Find current window index
-			for i, win in ipairs(windows) do
-				if win:id() == currentWin:id() then
+			for i, win in ipairs(validWindows) do
+				if currentWin and win:id() == currentWin:id() then
 					currentIndex = i
 					break
 				end
 			end
-			
+
 			-- Get next window (cycle back to 1 if at end)
-			local nextIndex = currentIndex == #windows and 1 or currentIndex + 1
-			local nextWin = windows[nextIndex]
-			
-			-- Force focus and bring to front
-			nextWin:becomeMain()
-			nextWin:focus()
-			targetApp:activate()
-			
-			hs.timer.doAfter(0.1, function()
-				moveCursorToCenter(nextWin)
-			end)
+			local nextIndex = currentIndex == #validWindows and 1 or currentIndex + 1
+			local nextWin = validWindows[nextIndex]
+			if nextWin then
+				local nextSpaceID = getWindowSpace(nextWin)
+				if nextSpaceID then
+					hs.spaces.gotoSpace(nextSpaceID)
+					hs.timer.doAfter(0.3, function()
+						nextWin:becomeMain()
+						nextWin:focus()
+						targetApp:activate()
+						moveCursorToCenter(nextWin)
+					end)
+				else
+					-- Fallback: focus without space switch
+					nextWin:becomeMain()
+					nextWin:focus()
+					targetApp:activate()
+					hs.timer.doAfter(0.1, function()
+						moveCursorToCenter(nextWin)
+					end)
+				end
+			end
 		end
 	else
-		-- Switch to the app (will focus last focused window)
-		if not targetApp then
-			hs.application.launchOrFocus(appName)
-			hs.timer.doAfter(0.5, function()
-				local win = hs.window.focusedWindow()
-				if win then
-					moveCursorToCenter(win)
-				end
-			end)
-		else
-			targetApp:activate()
-			hs.timer.doAfter(0.1, function()
-				local win = hs.window.focusedWindow()
-				if win then
-					moveCursorToCenter(win)
-				end
-			end)
-		end
+		-- Switch to the app
+		targetApp:activate()
+		hs.timer.doAfter(0.3, function()
+			local win = hs.window.focusedWindow()
+			if win then
+				moveCursorToCenter(win)
+			end
+		end)
 	end
 end
 
@@ -118,7 +214,6 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 	local keyCode = event:getKeyCode()
 	local key = event:getCharacters(true)
 
- 
 	-- Start leader sequence
 	if not leaderState then
 		if hs.keycodes.map[keyCode] == "f18" then
@@ -142,7 +237,6 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 
 		if key and key:match("%a") then
 			leaderSequence = leaderSequence .. key:lower()
-
 			if #leaderSequence == 1 then
 				performAction(leaderSequence)
 				resetLeader()
