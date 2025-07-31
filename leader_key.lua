@@ -192,9 +192,13 @@ local function performAction(sequence)
       -- return
     end
 
-    windows = hs.fnutils.filter(windows, function(win)
-      return win:title() ~= "" and not win:isMinimized()
-    end)
+    -- windows = hs.fnutils.filter(windows, function(win)
+    --   return win:title() ~= "" and not win:isMinimized()
+    -- end)
+
+    if windows and #windows > 0 then
+      table.sort(windows, function(a, b) return a:id() < b:id() end)
+    end
 
   -- Log window count and details
 		print("Found " .. #windows .. " windows for " .. appName)
@@ -203,7 +207,14 @@ local function performAction(sequence)
 		end    
 
 		-- Sort by window ID for consistent ordering
-		table.sort(validWindows, function(a, b) return a:id() < b:id() end)
+		-- table.sort(validWindows, function(a, b) return a:id() < b:id() end)
+
+    validWindows = hs.fnutils.filter(windows, function(win)
+      return win:title() ~= "" and not win:isMinimized() 
+    end)
+
+    table.sort(validWindows, function(a, b) return a:id() < b:id()
+    end)
 
 		if #validWindows > 1 then
 			local currentWin = hs.window.focusedWindow()
