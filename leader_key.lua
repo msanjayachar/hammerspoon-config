@@ -4,6 +4,13 @@ local hs = hs
 
 local leaderKeys = {}
 local windowIndexMap = {}
+local windowSelectionMode = false
+local windowSelectionMap = {
+	a = "1",
+	s = "2",
+	d = "3",
+	f = "4",
+}
 
 local appMappings = {
 	["c"] = { name = "Google Chrome", bundleID = "com.google.Chrome" },
@@ -119,22 +126,25 @@ local function performAction(sequence)
 			table.sort(windows, function(a, b)
 				return a:id() < b:id()
 			end)
+			-- if #currentAppWindows > 1 then
+			-- 	windowIndexMap = {}
+			-- 	for index, win in ipairs(currentAppWindows) do
+			-- 		local title = win:title()
+			-- 		windowIndexMap[tostring(index)] = win
+			-- 		hs.alert.show(index .. ": " .. title)
+			-- 	end
+			-- end
 			if #currentAppWindows > 1 then
-				print("#currentAppWindows: ", #currentAppWindows)
-				-- hs.alert.show("[" .. appName .. "] has " .. #currentAppWindows .. " open windows.")
-				-- List window titles
-				-- for index, win in ipairs(currentAppWindows) do
-				-- 	local title = win:title()
-				-- 	print(index .. ": " .. title)
-				-- 	hs.alert.show(index .. ": " .. title)
-				-- end
 				windowIndexMap = {}
 				for index, win in ipairs(currentAppWindows) do
-					local title = win:title()
+					if index > 4 then
+						break
+					end
 					windowIndexMap[tostring(index)] = win
-					print(index .. ": " .. title)
-					hs.alert.show(index .. ": " .. title)
 				end
+				windowSelectionMode = true
+				hs.alert.show("Select window: a(1) s(2) d(3) f(4)")
+				return
 			end
 		end
 
@@ -243,7 +253,9 @@ local function performAction(sequence)
 		else
 			local windows = targetApp:allWindows()
 			if #windows == 0 then
-				hs.alert.show(appName .. " has no windows")
+				hs.alert.show(appName .. " had no windows. ")
+				targetApp:kill()
+				hs.alert.show(appName .. " killed. ")
 				return
 			end
 
@@ -270,29 +282,29 @@ local function performAction(sequence)
 	end
 end
 
-local windowWatcher = hs.window.filter.new():subscribe(hs.window.filter.windowDestroyed, function(win, appName)
-	print("[Watcher] Auto-kill window watcher active")
-	local app = win:application()
-	if not app then
-		return
-	end
-
-	-- Only auto-kill for apps in your mapping
-	for _, entry in pairs(appMappings) do
-		if entry.bundleID == app:bundleID() then
-			local visibleWindows = hs.fnutils.filter(app:allWindows(), function(w)
-				return w:title() ~= "" and not w:isMinimized() and w:isVisible()
-			end)
-
-			if #visibleWindows == 0 then
-				app:kill()
-			end
-
-			break
-		end
-	end
-end)
-
+-- local windowWatcher = hs.window.filter.new():subscribe(hs.window.filter.windowDestroyed, function(win, appName)
+-- 	print("[Watcher] Auto-kill window watcher active")
+-- 	local app = win:application()
+-- 	if not app then
+-- 		return
+-- 	end
+--
+-- 	-- Only auto-kill for apps in your mapping
+-- 	for _, entry in pairs(appMappings) do
+-- 		if entry.bundleID == app:bundleID() then
+-- 			local visibleWindows = hs.fnutils.filter(app:allWindows(), function(w)
+-- 				return w:title() ~= "" and not w:isMinimized() and w:isVisible()
+-- 			end)
+--
+-- 			if #visibleWindows == 0 then
+-- 				app:kill()
+-- 			end
+--
+-- 			break
+-- 		end
+-- 	end
+-- end)
+--
 -- Event tap to handle key presses
 local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
 	local keyCode = event:getKeyCode()
@@ -313,6 +325,32 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 	end
 
 	if leaderState then
+		if windowSelectionMode then
+			local idx = windowSelectionMap[key]
+			local win = idx and windowIndexMap[idx]
+			if win then
+				local spaceID = getWindowSpace(win)
+				if spaceID and spaceID ~= hs.spaces.focusedSpace() then
+					hs.spaces.gotoSpace(spaceID)
+					hs.timer.doAfter(0.3, function()
+						win:focus()
+						moveCursorToCenter(win)
+						resetLeader()
+						windowSelectionMode = false
+					end)
+				else
+					win:focus()
+					moveCursorToCenter(win)
+					resetLeader()
+					windowSelectionMode = false
+				end
+			else
+				hs.alert.show("Invalid selection")
+				resetLeader()
+				windowSelectionMode = false
+			end
+			return true
+		end
 		-- Reset timer on every keystroke
 		if leaderTimer then
 			leaderTimer:stop()

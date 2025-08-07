@@ -157,8 +157,6 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 						end)
 						local winCount = #windows
 
-						hs.alert.show(appName .. ": " .. winCount .. " window(s)")
-
 						if winCount == 1 then
 							performAction(leaderSequence, 1)
 							resetLeader()

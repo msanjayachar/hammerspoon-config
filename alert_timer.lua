@@ -9,8 +9,6 @@ local timers = {}
 local counter = 0
 
 function module.start()
-	hs.alert.show("Alert timer started")
-
 	timers.everyThreeSeconds = hs.timer.doEvery(1800, function()
 		counter = counter + 1
 		local totalMinutes = counter * 30
@@ -30,23 +28,6 @@ function module.start()
 		hs.alert.show("Half an hour just went by", 1)
 		hs.alert.show(msg, 2)
 	end)
-
-	-- timers.testTimer = hs.timer.doEvery(3, function()
-	-- 	hs.alert.show("Testing alert every 3s!", 0.8)
-	-- end)
-
-	-- timers.testTimer = hs.timer.doEvery(5, function()
-	-- 	hs.alert.closeAll()
-	-- 	hs.alert.show("Testing alert every 5s!", 0.8)
-	-- end)
-	--
-	-- timers.testTimer = hs.timer.doEvery(60, function()
-	-- 	hs.alert.show("⏰ 1 minute just went by!")
-	-- end)
-
-	-- hs.timer.doEvery(1800, function()
-	-- 	hs.alert.show("⏰ 30 minutes just went by!")
-	-- end)
 end
 
 return module
