@@ -1,4 +1,4 @@
--- Hammerspoon configuration entry point
+-- Hamm<F18>berspoon configuration entry point
 ---@diagnostic disable-next-line: undefined-global
 local hs = hs
 
@@ -8,6 +8,7 @@ local windowManagement = require("window_management")
 local appWatcher = require("app_watcher")
 local leaderKeys = require("leader_key")
 local alertTimer = require("alert_timer")
+-- local _ = require("custom_alert_style")
 -- local desktopSwitcher = require("desktop_switcher")
 
 -- Initialize modules

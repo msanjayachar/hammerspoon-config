@@ -1,0 +1,20 @@
+-- -- ~/.hammerspoon/custom_alert_style.lua
+-- -- Apply global style settings for all hs.alert popups
+-- ---@diagnostic disable-next-line: undefined-global
+-- local hs = hs
+--
+-- hs.alert.defaultStyle = {
+-- 	strokeColor = { white = 1, alpha = 0.75 }, -- Border color
+-- 	fillColor = { red = 0, green = 0, blue = 0, alpha = 0.85 }, -- Background color
+-- 	textColor = { white = 1 }, -- Text color
+-- 	textFont = "Fira Code", -- Font (change if unavailable)
+-- 	textSize = 20, -- Font size
+-- 	radius = 10, -- Rounded corners
+-- 	atScreenEdge = 2, -- Show near top-right
+-- 	fadeInDuration = 0.15,
+-- 	fadeOutDuration = 0.3,
+-- 	strokeWidth = 2,
+-- 	padding = 15,
+-- }
+--
+-- return {}

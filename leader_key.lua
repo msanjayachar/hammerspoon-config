@@ -3,6 +3,7 @@
 local hs = hs
 
 local leaderKeys = {}
+local windowIndexMap = {}
 
 local appMappings = {
 	["c"] = { name = "Google Chrome", bundleID = "com.google.Chrome" },
@@ -21,7 +22,8 @@ local appMappings = {
 local leaderState = false
 local leaderSequence = ""
 local leaderTimer = nil
-local sequenceTimeout = 0.6 -- seconds
+-- local sequenceTimeout = 0.6 -- seconds
+local sequenceTimeout = 1.6 -- seconds
 
 local function resetLeader()
 	leaderState = false
@@ -88,6 +90,10 @@ local function performAction(sequence)
 		return win:title() ~= "" and not win:isMinimized() and win:isVisible()
 	end)
 
+	table.sort(currentAppWindows, function(a, b)
+		return a:id() < b:id()
+	end)
+
 	-- If we're already in the target app, cycle to next window
 	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
 		-- local windows = targetApp:allWindows()
@@ -115,7 +121,20 @@ local function performAction(sequence)
 			end)
 			if #currentAppWindows > 1 then
 				print("#currentAppWindows: ", #currentAppWindows)
-				hs.alert.show("[" .. appName .. "] has " .. #currentAppWindows .. " open windows.")
+				-- hs.alert.show("[" .. appName .. "] has " .. #currentAppWindows .. " open windows.")
+				-- List window titles
+				-- for index, win in ipairs(currentAppWindows) do
+				-- 	local title = win:title()
+				-- 	print(index .. ": " .. title)
+				-- 	hs.alert.show(index .. ": " .. title)
+				-- end
+				windowIndexMap = {}
+				for index, win in ipairs(currentAppWindows) do
+					local title = win:title()
+					windowIndexMap[tostring(index)] = win
+					print(index .. ": " .. title)
+					hs.alert.show(index .. ": " .. title)
+				end
 			end
 		end
 
@@ -304,10 +323,27 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 			leaderSequence = leaderSequence .. key:lower()
 			if #leaderSequence == 1 then
 				performAction(leaderSequence)
-				resetLeader()
+				-- resetLeader()
 				return true
 			end
 			return true
+		elseif key and windowIndexMap[key] then
+			local win = windowIndexMap[key]
+			if win then
+				local spaceID = getWindowSpace(win)
+				if spaceID and spaceID ~= hs.spaces.focusedSpace() then
+					hs.spaces.gotoSpace(spaceID)
+					hs.timer.doAfter(0.3, function()
+						win:focus()
+						moveCursorToCenter(win)
+						resetLeader()
+					end)
+				else
+					win:focus()
+					moveCursorToCenter(win)
+					resetLeader()
+				end
+			end
 		else
 			resetLeader()
 			return false
