@@ -90,7 +90,10 @@ local function performAction(sequence)
 
 	-- If we're already in the target app, cycle to next window
 	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
-		local windows = targetApp:allWindows()
+		-- local windows = targetApp:allWindows()
+		local windows = hs.fnutils.filter(targetApp:allWindows(), function(win)
+			return win:title() ~= "" and not win:isMinimized() and win:isVisible()
+		end)
 
 		-- First, try to unminimize if all windows are minimized
 		local allMinimized = hs.fnutils.every(windows, function(win)
@@ -247,6 +250,29 @@ local function performAction(sequence)
 		end
 	end
 end
+
+local windowWatcher = hs.window.filter.new():subscribe(hs.window.filter.windowDestroyed, function(win, appName)
+	print("[Watcher] Auto-kill window watcher active")
+	local app = win:application()
+	if not app then
+		return
+	end
+
+	-- Only auto-kill for apps in your mapping
+	for _, entry in pairs(appMappings) do
+		if entry.bundleID == app:bundleID() then
+			local visibleWindows = hs.fnutils.filter(app:allWindows(), function(w)
+				return w:title() ~= "" and not w:isMinimized() and w:isVisible()
+			end)
+
+			if #visibleWindows == 0 then
+				app:kill()
+			end
+
+			break
+		end
+	end
+end)
 
 -- Event tap to handle key presses
 local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
