@@ -15,7 +15,7 @@ local appMappings = {
 	["g"] = { name = "ChatGPT", bundleID = "com.openai.chat" },
 	["o"] = { name = "Obsidian", bundleID = "md.obsidian" },
 	["k"] = { name = "Docker", bundleID = "com.docker.docker" },
-	["p"] = { name = "Postman", bundleID = "com.postmanlabs.mac" },
+	["t"] = { name = "Postman", bundleID = "com.postmanlabs.mac" },
 }
 
 local leaderState = false
@@ -64,95 +64,6 @@ local function getWindowSpace(win)
 	return nil
 end
 
--- Function to log space and application info
-local function logSpaceInfo()
-	local spaces = hs.spaces.allSpaces()
-	if not spaces then
-		return
-	end
-	local totalSpaces = 0
-	for _, spaceList in pairs(spaces) do
-		totalSpaces = totalSpaces + #spaceList
-	end
-	print("Number of spaces: " .. totalSpaces)
-
-	-- Track apps per space
-	local spaceAppMap = {}
-	for screenUUID, spaceList in pairs(spaces) do
-		for _, spaceID in ipairs(spaceList) do
-			spaceAppMap[spaceID] = {}
-			local spaceWindows = hs.spaces.windowsForSpace(spaceID) or {}
-			for _, winID in ipairs(spaceWindows) do
-				local win = hs.window.get(winID)
-				if win and win:application() then
-					local appName = win:application():name()
-					if appName then
-						spaceAppMap[spaceID][appName] = true
-						print(
-							"Window in space "
-								.. spaceID
-								.. ": '"
-								.. win:title()
-								.. "' (App: "
-								.. appName
-								.. ", ID: "
-								.. win:id()
-								.. ", Minimized: "
-								.. tostring(win:isMinimized())
-								.. ", Visible: "
-								.. tostring(win:isVisible())
-								.. ")"
-						)
-					end
-				end
-			end
-		end
-	end
-
-	-- Fallback: Check all windows
-	local allWindows = hs.window.allWindows()
-	for _, win in ipairs(allWindows) do
-		local appName = win:application() and win:application():name()
-		if appName then
-			local spaceID = getWindowSpace(win)
-			if spaceID and not spaceAppMap[spaceID][appName] then
-				spaceAppMap[spaceID][appName] = true
-				print(
-					"Fallback window in space "
-						.. spaceID
-						.. ": '"
-						.. win:title()
-						.. "' (App: "
-						.. appName
-						.. ", ID: "
-						.. win:id()
-						.. ", Minimized: "
-						.. tostring(win:isMinimized())
-						.. ", Visible: "
-						.. tostring(win:isVisible())
-						.. ")"
-				)
-			end
-		end
-	end
-
-	-- Log app counts and names
-	for screenUUID, spaceList in pairs(spaces) do
-		for _, spaceID in ipairs(spaceList) do
-			local appCount = 0
-			local appList = {}
-			for appName, _ in pairs(spaceAppMap[spaceID] or {}) do
-				appCount = appCount + 1
-				table.insert(appList, appName)
-			end
-			print("Number of applications on space " .. spaceID .. " (screen " .. screenUUID .. "): " .. appCount)
-			print(
-				"Applications on space " .. spaceID .. ": " .. (#appList > 0 and table.concat(appList, ", ") or "None")
-			)
-		end
-	end
-end
-
 -- Function to perform application action or window switching
 local function performAction(sequence)
 	local appEntry = appMappings[sequence]
@@ -171,6 +82,11 @@ local function performAction(sequence)
 
 	print("currentApp: ", currentApp)
 	print("targetApp: ", targetApp)
+
+	-- local currentAppWindows = currentApp:allWindows()
+	local currentAppWindows = hs.fnutils.filter(currentApp:allWindows(), function(win)
+		return win:title() ~= "" and not win:isMinimized() and win:isVisible()
+	end)
 
 	-- If we're already in the target app, cycle to next window
 	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
@@ -194,6 +110,10 @@ local function performAction(sequence)
 			table.sort(windows, function(a, b)
 				return a:id() < b:id()
 			end)
+			if #currentAppWindows > 1 then
+				print("#currentAppWindows: ", #currentAppWindows)
+				hs.alert.show("[" .. appName .. "] has " .. #currentAppWindows .. " open windows.")
+			end
 		end
 
 		-- Log window count and details
@@ -202,7 +122,7 @@ local function performAction(sequence)
 			print("  Window " .. i .. ": " .. win:title() .. " (ID: " .. win:id() .. ")")
 		end
 
-		validWindows = hs.fnutils.filter(windows, function(win)
+		local validWindows = hs.fnutils.filter(windows, function(win)
 			return win:title() ~= "" and not win:isMinimized()
 		end)
 
@@ -272,15 +192,6 @@ local function performAction(sequence)
 						moveCursorToCenter(nextWin)
 						print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
 					end)
-					-- -- Fallback: focus without space switch
-					-- print("DEBUG: No space ID for window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. "), focusing without space switch")
-					-- nextWin:becomeMain()
-					-- nextWin:focus()
-					-- targetApp:activate()
-					-- hs.timer.doAfter(0.1, function()
-					-- 	moveCursorToCenter(nextWin)
-					-- 	print("DEBUG: Focused window '" .. nextWin:title() .. "' (ID: " .. nextWin:id() .. ")")
-					-- end)
 				end
 			else
 				print("DEBUG: No next window found")
