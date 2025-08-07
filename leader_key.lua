@@ -126,15 +126,17 @@ local function performAction(sequence)
 			table.sort(windows, function(a, b)
 				return a:id() < b:id()
 			end)
-			-- if #currentAppWindows > 1 then
-			-- 	windowIndexMap = {}
-			-- 	for index, win in ipairs(currentAppWindows) do
-			-- 		local title = win:title()
-			-- 		windowIndexMap[tostring(index)] = win
-			-- 		hs.alert.show(index .. ": " .. title)
-			-- 	end
-			-- end
-			if #currentAppWindows > 1 then
+			if #currentAppWindows == 2 then
+				print("hello from currentAppWindows == 2")
+				local currentWin = hs.window.focusedWindow()
+				local nextWin = (currentWin:id() == currentAppWindows[1]:id()) and currentAppWindows[2]
+					or currentAppWindows[1]
+				print("nextWin: ", nextWin)
+				nextWin:focus()
+				moveCursorToCenter(nextWin)
+				resetLeader()
+				return
+			elseif #currentAppWindows > 2 then
 				windowIndexMap = {}
 				for index, win in ipairs(currentAppWindows) do
 					if index > 4 then
