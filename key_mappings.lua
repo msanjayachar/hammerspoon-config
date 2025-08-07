@@ -5,6 +5,8 @@ local keyMappings = {}
 local hs = hs
 local hotkeyGroups = {}
 
+local windowManagement = require("move_to_other_display")
+
 local sequenceTimeout = 0.15 -- Time for second tap (250ms)
 local sequenceTimeoutTwo = 0.30
 
@@ -59,6 +61,12 @@ end
 
 -- Initialize key mappings
 function keyMappings.init()
+	local moveWindowHotkey = hs.hotkey.new({ "ctrl" }, "m", function()
+		windowManagement.moveWindowToOtherDisplay()
+	end)
+
+	table.insert(hotkeyGroups, moveWindowHotkey)
+
 	-- Scroll Up (Cmd + u)
 	local scrollUp = hs.hotkey.new(
 		{ "cmd" },
