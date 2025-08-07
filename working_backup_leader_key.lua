@@ -29,8 +29,10 @@ local appMappings = {
 local leaderState = false
 local leaderSequence = ""
 local leaderTimer = nil
--- local sequenceTimeout = 0.6 -- seconds
-local sequenceTimeout = 1.6 -- seconds
+local sequenceTimeout = 0.4 -- seconds
+
+local windowSelectionTimeout = 0.6
+local windowSelectionTimer = nil
 
 local function resetLeader()
 	leaderState = false
@@ -137,6 +139,8 @@ local function performAction(sequence)
 				resetLeader()
 				return
 			elseif #currentAppWindows > 2 then
+				-- [ ] should be able to switch between windows just using the leader and application character and also be able to switch between windows using select windows options ("Select window: a(1) s(2) d(3) f(4)")
+				print("hello from > 2 windows")
 				windowIndexMap = {}
 				for index, win in ipairs(currentAppWindows) do
 					if index > 4 then
@@ -145,8 +149,26 @@ local function performAction(sequence)
 					windowIndexMap[tostring(index)] = win
 				end
 				windowSelectionMode = true
-				hs.alert.show("Select window: a(1) s(2) d(3) f(4)")
-				return
+				windowSelectionTimer = hs.timer.doAfter(windowSelectionTimeout, function()
+					windowSelectionMode = false
+					hs.alert.show("Window selection timed out")
+				end)
+				local promptLines = { "Select window:" }
+				local count = 0
+				for key, indexStr in pairs(windowSelectionMap) do
+					local win = currentAppWindows[tonumber(indexStr)]
+					if win then
+						count = count + 1
+						local title = win:title() or "Untitled"
+						title = title:match("%S") and title or "[No Title]"
+						title = title:sub(1, 60)
+						table.insert(promptLines, string.format("  %s (%d): %s", key, indexStr, title))
+					end
+				end
+				-- return hs.alert.show(table.concat(promptLines, "\n"))
+				if #promptLines > 1 then
+					hs.alert.show(table.concat(promptLines, "\n"))
+				end
 			end
 		end
 
@@ -328,17 +350,29 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 
 	if leaderState then
 		if windowSelectionMode then
+			if windowSelectionTimer then
+				windowSelectionTimer:stop()
+				windowSelectionTimer = nil
+			end
+
 			local idx = windowSelectionMap[key]
 			local win = idx and windowIndexMap[idx]
 			if win then
 				local spaceID = getWindowSpace(win)
 				if spaceID and spaceID ~= hs.spaces.focusedSpace() then
-					hs.spaces.gotoSpace(spaceID)
-					hs.timer.doAfter(0.3, function()
+					-- hs.spaces.gotoSpace(spaceID)
+					-- hs.timer.doAfter(0.3, function()
+					-- 	win:focus()
+					-- 	moveCursorToCenter(win)
+					-- 	resetLeader()
+					-- 	windowSelectionMode = false
+					-- end)
+					targetApp:activate()
+					hs.timer.doAfter(0.1, function()
 						win:focus()
 						moveCursorToCenter(win)
 						resetLeader()
-						windowSelectionMode = false
+						windowSelectionMode()
 					end)
 				else
 					win:focus()
