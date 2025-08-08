@@ -90,18 +90,78 @@ local function performAction(sequence)
 
 	local appName = appEntry.name
 	local bundleID = appEntry.bundleID
-	print("appName: ", appName)
-
 	local urlToOpen = appEntry.url
 
-	-- don't think this is the best way to get the currentApp
 	local currentApp = hs.application.frontmostApplication()
 	local targetApp = hs.application.get(bundleID)
 
-	print("currentApp: ", currentApp)
-	print("targetApp: ", targetApp)
+	-- Handle Excalidraw specifically
+	if sequence == "e" then
+		local chromiumApp = hs.application.get(bundleID)
+		local excalidrawWindow = nil
 
-	-- local currentAppWindows = currentApp:allWindows()
+		if chromiumApp then
+			local windows = hs.fnutils.filter(chromiumApp:allWindows(), function(win)
+				return win:title():find("Excalidraw") and not win:isMinimized() and win:isVisible()
+			end)
+			excalidrawWindow = windows[1]
+		end
+
+		if excalidrawWindow then
+			-- Excalidraw window exists, focus it
+			local spaceID = getWindowSpace(excalidrawWindow)
+			if spaceID and spaceID ~= hs.spaces.focusedSpace() then
+				hs.spaces.gotoSpace(spaceID)
+				hs.timer.doAfter(0.3, function()
+					excalidrawWindow:focus()
+					chromiumApp:activate()
+					moveCursorToCenter(excalidrawWindow)
+					resetLeader()
+				end)
+			else
+				excalidrawWindow:focus()
+				chromiumApp:activate()
+				moveCursorToCenter(excalidrawWindow)
+				resetLeader()
+			end
+			return
+		else
+			-- No Excalidraw window, open a new one
+			if not chromiumApp then
+				hs.application.launchOrFocusByBundleID(bundleID)
+				hs.timer.doAfter(0.5, function()
+					local launchedApp = hs.application.get(bundleID)
+					if launchedApp and launchedApp:isRunning() then
+						launchedApp:activate()
+						hs.urlevent.openURLWithBundle(urlToOpen, bundleID)
+						hs.timer.doAfter(0.3, function()
+							local win = hs.window.focusedWindow()
+							if win then
+								moveCursorToCenter(win)
+							end
+							resetLeader()
+						end)
+					else
+						hs.alert.show("Failed to launch: " .. appName)
+						resetLeader()
+					end
+				end)
+			else
+				chromiumApp:activate()
+				hs.urlevent.openURLWithBundle(urlToOpen, bundleID)
+				hs.timer.doAfter(0.3, function()
+					local win = hs.window.focusedWindow()
+					if win then
+						moveCursorToCenter(win)
+					end
+					resetLeader()
+				end)
+			end
+			return
+		end
+	end
+
+	-- Existing logic for other apps
 	local currentAppWindows = hs.fnutils.filter(currentApp:allWindows(), function(win)
 		return win:title() ~= "" and not win:isMinimized() and win:isVisible()
 	end)
@@ -112,7 +172,6 @@ local function performAction(sequence)
 
 	-- If we're already in the target app, cycle to next window
 	if currentApp and targetApp and currentApp:bundleID() == targetApp:bundleID() then
-		-- local windows = targetApp:allWindows()
 		local windows = hs.fnutils.filter(targetApp:allWindows(), function(win)
 			return win:title() ~= "" and not win:isMinimized() and win:isVisible()
 		end)
@@ -146,7 +205,6 @@ local function performAction(sequence)
 				resetLeader()
 				return
 			elseif #currentAppWindows > 2 then
-				-- [ ] should be able to switch between windows just using the leader and application character and also be able to switch between windows using select windows options ("Select window: a(1) s(2) d(3) f(4)")
 				print("hello from > 2 windows")
 				windowIndexMap = {}
 				for index, win in ipairs(currentAppWindows) do
@@ -172,7 +230,6 @@ local function performAction(sequence)
 						table.insert(promptLines, string.format("  %s (%d): %s", key, indexStr, title))
 					end
 				end
-				-- return hs.alert.show(table.concat(promptLines, "\n"))
 				if #promptLines > 1 then
 					hs.alert.show(table.concat(promptLines, "\n"))
 				end
@@ -265,14 +322,11 @@ local function performAction(sequence)
 	else
 		-- Switch to the app (will focus last focused window)
 		if not targetApp then
-			-- hs.application.launchOrFocus(appName)
 			hs.application.launchOrFocusByBundleID(bundleID)
-
 			hs.timer.doAfter(0.5, function()
 				local launchedApp = hs.application.get(bundleID)
 				if launchedApp and launchedApp:isRunning() then
 					launchedApp:activate()
-
 					local win = hs.window.focusedWindow()
 					if win then
 						moveCursorToCenter(win)
@@ -315,31 +369,9 @@ local function performAction(sequence)
 			end)
 		end
 	end
+	resetLeader()
 end
 
--- local windowWatcher = hs.window.filter.new():subscribe(hs.window.filter.windowDestroyed, function(win, appName)
--- 	print("[Watcher] Auto-kill window watcher active")
--- 	local app = win:application()
--- 	if not app then
--- 		return
--- 	end
---
--- 	-- Only auto-kill for apps in your mapping
--- 	for _, entry in pairs(appMappings) do
--- 		if entry.bundleID == app:bundleID() then
--- 			local visibleWindows = hs.fnutils.filter(app:allWindows(), function(w)
--- 				return w:title() ~= "" and not w:isMinimized() and w:isVisible()
--- 			end)
---
--- 			if #visibleWindows == 0 then
--- 				app:kill()
--- 			end
---
--- 			break
--- 		end
--- 	end
--- end)
---
 -- Event tap to handle key presses
 local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
 	local keyCode = event:getKeyCode()
@@ -371,19 +403,12 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 			if win then
 				local spaceID = getWindowSpace(win)
 				if spaceID and spaceID ~= hs.spaces.focusedSpace() then
-					-- hs.spaces.gotoSpace(spaceID)
-					-- hs.timer.doAfter(0.3, function()
-					-- 	win:focus()
-					-- 	moveCursorToCenter(win)
-					-- 	resetLeader()
-					-- 	windowSelectionMode = false
-					-- end)
-					targetApp:activate()
-					hs.timer.doAfter(0.1, function()
+					hs.spaces.gotoSpace(spaceID)
+					hs.timer.doAfter(0.3, function()
 						win:focus()
 						moveCursorToCenter(win)
 						resetLeader()
-						windowSelectionMode()
+						windowSelectionMode = false
 					end)
 				else
 					win:focus()
@@ -408,7 +433,6 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 			leaderSequence = leaderSequence .. key:lower()
 			if #leaderSequence == 1 then
 				performAction(leaderSequence)
-				-- resetLeader()
 				return true
 			end
 			return true
