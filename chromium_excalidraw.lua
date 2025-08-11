@@ -24,6 +24,7 @@ local appMappings = {
 	["o"] = { name = "Obsidian", bundleID = "md.obsidian" },
 	["k"] = { name = "Docker", bundleID = "com.docker.docker" },
 	["t"] = { name = "Postman", bundleID = "com.postmanlabs.mac" },
+	["n"] = { name = "Notion", bundleID = "notion.id" },
 	["e"] = {
 		name = "Chromium - Excalidraw",
 		bundleID = "org.chromium.Chromium",
