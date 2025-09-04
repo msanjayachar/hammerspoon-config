@@ -12,6 +12,9 @@ local leaderKeys = require("chromium_excalidraw")
 local alertTimer = require("alert_timer")
 -- local _ = require("custom_alert_style")
 -- local desktopSwitcher = require("desktop_switcher")
+-- -- -- -- -- -- -- -- local desktopSwitcher = require("move_between_desktops")
+local shrink = require("shrink_all")
+shrink.bind()
 
 -- Initialize modules
 keyMappings.init()

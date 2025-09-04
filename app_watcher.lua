@@ -6,6 +6,7 @@ local hs = hs
 
 -- Position ChatGPT window on launch
 local function positionChatGPTWindow()
+	hs.printf("[DEBUG] positionChatGPTWindow called")
 	local app = hs.application.get("ChatGPT")
 	if not app then
 		return
@@ -35,4 +36,3 @@ function appWatcher.init()
 end
 
 return appWatcher
-
