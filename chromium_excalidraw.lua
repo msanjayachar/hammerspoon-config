@@ -26,6 +26,7 @@ local appMappings = {
 	["p"] = { name = "Postman", bundleID = "com.postmanlabs.mac" },
 	["n"] = { name = "Notion", bundleID = "notion.id" },
 	["t"] = { name = "Todoist", bundleID = "com.todoist.mac.Todoist" },
+	["s"] = { name = "Spotify", bundleID = "com.spotify.client" },
 	["e"] = {
 		name = "Chromium - Excalidraw",
 		bundleID = "org.chromium.Chromium",
