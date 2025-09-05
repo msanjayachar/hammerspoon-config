@@ -25,10 +25,15 @@ local appMappings = {
 	["k"] = { name = "Docker", bundleID = "com.docker.docker" },
 	["t"] = { name = "Postman", bundleID = "com.postmanlabs.mac" },
 	["n"] = { name = "Notion", bundleID = "notion.id" },
-	["e"] = {
-		name = "Chromium - Excalidraw",
-		bundleID = "org.chromium.Chromium",
-		url = "https://excalidraw.com",
+	-- ["e"] = {
+	-- 	name = "Chromium - Excalidraw",
+	-- 	bundleID = "org.chromium.Chromium",
+	-- 	url = "https://excalidraw.com",
+	-- },
+	["l"] = {
+		name = "Chrome - Linear",
+		bundleID = "com.google.Chrome",
+		url = "https://linear.app/sanjayachar/team/SAN/active",
 	},
 }
 
