@@ -20,6 +20,7 @@ local appMappings = {
 	["a"] = { name = "Arc", bundleID = "company.thebrowser.Browser" },
 	["d"] = { name = "Discord", bundleID = "com.hnc.Discord" },
 	["v"] = { name = "Visual Studio Code", bundleID = "com.microsoft.VSCode" },
+	["r"] = { name = "Cursor", bundleID = "com.todesktop.230313mzl4w4u92" },
 	["g"] = { name = "ChatGPT", bundleID = "com.openai.chat" },
 	["o"] = { name = "Obsidian", bundleID = "md.obsidian" },
 	["k"] = { name = "Docker", bundleID = "com.docker.docker" },

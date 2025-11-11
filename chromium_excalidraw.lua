@@ -20,6 +20,7 @@ local appMappings = {
 	["a"] = { name = "Arc", bundleID = "company.thebrowser.Browser" },
 	["d"] = { name = "Discord", bundleID = "com.hnc.Discord" },
 	["v"] = { name = "Visual Studio Code", bundleID = "com.microsoft.VSCode" },
+	["r"] = { name = "Cursor", bundleID = "com.todesktop.230313mzl4w4u92" },
 	["g"] = { name = "ChatGPT", bundleID = "com.openai.chat" },
 	["o"] = { name = "Obsidian", bundleID = "md.obsidian" },
 	["k"] = { name = "Docker", bundleID = "com.docker.docker" },
@@ -27,15 +28,15 @@ local appMappings = {
 	["n"] = { name = "Notion", bundleID = "notion.id" },
 	["t"] = { name = "Todoist", bundleID = "com.todoist.mac.Todoist" },
 	["s"] = { name = "Spotify", bundleID = "com.spotify.client" },
+	["w"] = { name = "Whatsapp", bundleID = "net.whatsapp.Whatsapp" },
+	["z"] = { name = "Zoom", bundleID = "us.zoom.xos" },
+	["m"] = { name = "Ollama", bundleID = "com.electron.ollama" },
+	["y"] = { name = "Youtube", bundleID = "com.brave.Browser.app.agimnkijcaahngcdmfeangaknmldooml" },
+	["l"] = { name = "Linear", bundleID = "com.linear" },
 	["e"] = {
 		name = "Chromium - Excalidraw",
 		bundleID = "org.chromium.Chromium",
 		url = "https://excalidraw.com",
-	},
-	["l"] = {
-		name = "Chrome - Linear",
-		bundleID = "com.google.Chrome",
-		url = "https://linear.app/sanjayachar/team/SAN/active",
 	},
 }
 
@@ -102,72 +103,6 @@ local function performAction(sequence)
 
 	local currentApp = hs.application.frontmostApplication()
 	local targetApp = hs.application.get(bundleID)
-
-	-- Handle linear separately
-	if sequence == "l" then
-		local chromeApp = hs.application.get(bundleID)
-		local linearWindow = nil
-
-		if chromeApp then
-			local windows = hs.fnutils.filter(chromeApp:allWindows(), function(win)
-				return win:title():find("Sanjayachar") and not win:isMinimized() and win:isVisible()
-			end)
-			linearWindow = windows[1]
-		end
-
-		if linearWindow then
-			-- Excalidraw window exists, focus it
-			local spaceID = getWindowSpace(linearWindow)
-			if spaceID and spaceID ~= hs.spaces.focusedSpace() then
-				hs.spaces.gotoSpace(spaceID)
-				hs.timer.doAfter(0.3, function()
-					linearWindow:focus()
-					chromeApp:activate()
-					moveCursorToCenter(linearWindow)
-					resetLeader()
-				end)
-			else
-				linearWindow:focus()
-				chromeApp:activate()
-				moveCursorToCenter(linearWindow)
-				resetLeader()
-			end
-			return
-		else
-			-- No Linear window, open a new one
-			if not chromeApp then
-				hs.application.launchOrFocusByBundleID(bundleID)
-				hs.timer.doAfter(0.5, function()
-					local launchedApp = hs.application.get(bundleID)
-					if launchedApp and launchedApp:isRunning() then
-						launchedApp:activate()
-						hs.urlevent.openURLWithBundle(urlToOpen, bundleID)
-						hs.timer.doAfter(0.3, function()
-							local win = hs.window.focusedWindow()
-							if win then
-								moveCursorToCenter(win)
-							end
-							resetLeader()
-						end)
-					else
-						hs.alert.show("Failed to launch: " .. appName)
-						resetLeader()
-					end
-				end)
-			else
-				chromeApp:activate()
-				hs.urlevent.openURLWithBundle(urlToOpen, bundleID)
-				hs.timer.doAfter(0.3, function()
-					local win = hs.window.focusedWindow()
-					if win then
-						moveCursorToCenter(win)
-					end
-					resetLeader()
-				end)
-			end
-			return
-		end
-	end
 
 	-- Handle Excalidraw specifically
 	if sequence == "e" then
