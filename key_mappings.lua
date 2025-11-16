@@ -7,12 +7,12 @@ local hotkeyGroups = {}
 
 local windowManagement = require("move_to_other_display")
 
-local sequenceTimeout = 0.15 -- Time for second tap (250ms)
+local sequenceTimeout = 0.15 -- Time for second tap (150ms)
 local sequenceTimeoutTwo = 0.30
 
 -- Global state for tracking sequences
 local sequence_last_cmd_j_press_time = 0
-local sequence_last_cmd_l_press_time = 0
+local sequence_last_cmd_k_press_time = 0
 local sequence_last_cmd_slash_press_time = 0
 local sequence_last_cmd_period_press_time = 0
 
@@ -93,66 +93,72 @@ function keyMappings.init()
 		end
 	)
 
-	-- Cmd + J (character/word left)
+	-- Cmd + J (single: char-right, double: word-right)
 	local cmdJHotkey = hs.hotkey.new(
 		{ "cmd" },
 		"j",
 		function()
 			local currentTime = hs.timer.secondsSinceEpoch()
 			if (currentTime - sequence_last_cmd_j_press_time) < sequenceTimeout then
+				-- double-tap: jump one word to the right (option/alt + right)
 				if isShiftPressed() then
-					hs.eventtap.keyStroke({ "alt", "shift" }, "left", 0)
+					hs.eventtap.keyStroke({ "alt", "shift" }, "right", 0)
 				else
-					hs.eventtap.keyStroke({ "alt" }, "left", 0)
+					hs.eventtap.keyStroke({ "alt" }, "right", 0)
 				end
 				sequence_last_cmd_j_press_time = 0
 			else
+				-- single: move one char right
 				if isShiftPressed() then
-					hs.eventtap.keyStroke({ "shift" }, "left", 0)
+					hs.eventtap.keyStroke({ "shift" }, "right", 0)
 				else
-					hs.eventtap.keyStroke(nil, "left", 0)
+					hs.eventtap.keyStroke(nil, "right", 0)
 				end
 				sequence_last_cmd_j_press_time = currentTime
 			end
 		end,
 		nil,
 		function()
-			if isShiftPressed() then
-				hs.eventtap.keyStroke({ "shift" }, "left", 0)
-			else
-				hs.eventtap.keyStroke(nil, "left", 0)
-			end
-		end
-	)
-
-	-- Cmd + L (character/word right)
-	local cmdLHotkey = hs.hotkey.new(
-		{ "cmd" },
-		"l",
-		function()
-			local currentTime = hs.timer.secondsSinceEpoch()
-			if (currentTime - sequence_last_cmd_l_press_time) < sequenceTimeout then
-				if isShiftPressed() then
-					hs.eventtap.keyStroke({ "alt", "shift" }, "right", 0)
-				else
-					hs.eventtap.keyStroke({ "alt" }, "right", 0)
-				end
-				sequence_last_cmd_l_press_time = 0
-			else
-				if isShiftPressed() then
-					hs.eventtap.keyStroke({ "shift" }, "right", 0)
-				else
-					hs.eventtap.keyStroke(nil, "right", 0)
-				end
-				sequence_last_cmd_l_press_time = currentTime
-			end
-		end,
-		nil,
-		function()
+			-- key repeat: behave like single press repeat
 			if isShiftPressed() then
 				hs.eventtap.keyStroke({ "shift" }, "right", 0)
 			else
 				hs.eventtap.keyStroke(nil, "right", 0)
+			end
+		end
+	)
+
+	-- Cmd + K (single: char-left, double: word-left)
+	local cmdKHotkey = hs.hotkey.new(
+		{ "cmd" },
+		"k",
+		function()
+			local currentTime = hs.timer.secondsSinceEpoch()
+			if (currentTime - sequence_last_cmd_k_press_time) < sequenceTimeout then
+				-- double-tap: jump one word to the left (option/alt + left)
+				if isShiftPressed() then
+					hs.eventtap.keyStroke({ "alt", "shift" }, "left", 0)
+				else
+					hs.eventtap.keyStroke({ "alt" }, "left", 0)
+				end
+				sequence_last_cmd_k_press_time = 0
+			else
+				-- single: move one char left
+				if isShiftPressed() then
+					hs.eventtap.keyStroke({ "shift" }, "left", 0)
+				else
+					hs.eventtap.keyStroke(nil, "left", 0)
+				end
+				sequence_last_cmd_k_press_time = currentTime
+			end
+		end,
+		nil,
+		function()
+			-- key repeat: behave like single press repeat
+			if isShiftPressed() then
+				hs.eventtap.keyStroke({ "shift" }, "left", 0)
+			else
+				hs.eventtap.keyStroke(nil, "left", 0)
 			end
 		end
 	)
@@ -191,7 +197,7 @@ function keyMappings.init()
 	table.insert(hotkeyGroups, scrollUp)
 	table.insert(hotkeyGroups, scrollDown)
 	table.insert(hotkeyGroups, cmdJHotkey)
-	table.insert(hotkeyGroups, cmdLHotkey)
+	table.insert(hotkeyGroups, cmdKHotkey)
 	table.insert(hotkeyGroups, cmdSlashHotkey)
 	table.insert(hotkeyGroups, cmdPeriodHotkey)
 
