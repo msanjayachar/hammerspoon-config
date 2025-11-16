@@ -12,7 +12,7 @@ local sequenceTimeoutTwo = 0.30
 
 -- Global state for tracking sequences
 local sequence_last_cmd_j_press_time = 0
-local sequence_last_cmd_k_press_time = 0
+local sequence_last_cmd_semicolon_press_time = 0
 local sequence_last_cmd_slash_press_time = 0
 local sequence_last_cmd_period_press_time = 0
 
@@ -27,14 +27,20 @@ local KEYMAP = {
 	{ "leftCmd+leftShift", "i", "cmd+shift", "up" },
 	{ "leftCmd+rightShift", "i", "shift", "up" },
 	{ "leftCmd+leftShift+rightShift", "i", "shift", "up" },
+
 	{ "leftCmd", "h", "cmd", "left" },
 	{ "leftCmd+leftShift", "h", "cmd+shift", "left" },
+
+	-- keep k in KEYMAP for moving down (unchanged)
 	{ "leftCmd", "k", nil, "down" },
 	{ "leftCmd+leftShift", "k", "cmd+shift", "down" },
 	{ "leftCmd+rightShift", "k", "shift", "down" },
 	{ "leftCmd+leftShift+rightShift", "k", "shift", "down" },
-	{ "leftCmd", ";", "cmd", "right" },
-	{ "leftCmd+leftShift", ";", "cmd+shift", "right" },
+
+	-- Make Cmd+; act like Right (one char). Shift+Cmd+; -> Shift+Right (select right)
+	{ "leftCmd", ";", nil, "right" },
+	{ "leftCmd+leftShift", ";", "shift", "right" },
+
 	{ "leftCmd", "'", "cmd", "right" },
 	{ "leftCmd+leftShift", "'", "cmd+shift", "right" },
 }
@@ -93,55 +99,20 @@ function keyMappings.init()
 		end
 	)
 
-	-- Cmd + J (single: char-right, double: word-right)
+	-- Cmd + J (single: char-left, double: word-left)
 	local cmdJHotkey = hs.hotkey.new(
 		{ "cmd" },
 		"j",
 		function()
 			local currentTime = hs.timer.secondsSinceEpoch()
 			if (currentTime - sequence_last_cmd_j_press_time) < sequenceTimeout then
-				-- double-tap: jump one word to the right (option/alt + right)
-				if isShiftPressed() then
-					hs.eventtap.keyStroke({ "alt", "shift" }, "right", 0)
-				else
-					hs.eventtap.keyStroke({ "alt" }, "right", 0)
-				end
-				sequence_last_cmd_j_press_time = 0
-			else
-				-- single: move one char right
-				if isShiftPressed() then
-					hs.eventtap.keyStroke({ "shift" }, "right", 0)
-				else
-					hs.eventtap.keyStroke(nil, "right", 0)
-				end
-				sequence_last_cmd_j_press_time = currentTime
-			end
-		end,
-		nil,
-		function()
-			-- key repeat: behave like single press repeat
-			if isShiftPressed() then
-				hs.eventtap.keyStroke({ "shift" }, "right", 0)
-			else
-				hs.eventtap.keyStroke(nil, "right", 0)
-			end
-		end
-	)
-
-	-- Cmd + K (single: char-left, double: word-left)
-	local cmdKHotkey = hs.hotkey.new(
-		{ "cmd" },
-		"k",
-		function()
-			local currentTime = hs.timer.secondsSinceEpoch()
-			if (currentTime - sequence_last_cmd_k_press_time) < sequenceTimeout then
 				-- double-tap: jump one word to the left (option/alt + left)
 				if isShiftPressed() then
 					hs.eventtap.keyStroke({ "alt", "shift" }, "left", 0)
 				else
 					hs.eventtap.keyStroke({ "alt" }, "left", 0)
 				end
-				sequence_last_cmd_k_press_time = 0
+				sequence_last_cmd_j_press_time = 0
 			else
 				-- single: move one char left
 				if isShiftPressed() then
@@ -149,7 +120,7 @@ function keyMappings.init()
 				else
 					hs.eventtap.keyStroke(nil, "left", 0)
 				end
-				sequence_last_cmd_k_press_time = currentTime
+				sequence_last_cmd_j_press_time = currentTime
 			end
 		end,
 		nil,
@@ -159,6 +130,41 @@ function keyMappings.init()
 				hs.eventtap.keyStroke({ "shift" }, "left", 0)
 			else
 				hs.eventtap.keyStroke(nil, "left", 0)
+			end
+		end
+	)
+
+	-- Cmd + ; (single: char-right, double: word-right)
+	local cmdSemicolonHotkey = hs.hotkey.new(
+		{ "cmd" },
+		";",
+		function()
+			local currentTime = hs.timer.secondsSinceEpoch()
+			if (currentTime - sequence_last_cmd_semicolon_press_time) < sequenceTimeout then
+				-- double-tap: jump one word to the right (option/alt + right)
+				if isShiftPressed() then
+					hs.eventtap.keyStroke({ "alt", "shift" }, "right", 0)
+				else
+					hs.eventtap.keyStroke({ "alt" }, "right", 0)
+				end
+				sequence_last_cmd_semicolon_press_time = 0
+			else
+				-- single: move one char right
+				if isShiftPressed() then
+					hs.eventtap.keyStroke({ "shift" }, "right", 0)
+				else
+					hs.eventtap.keyStroke(nil, "right", 0)
+				end
+				sequence_last_cmd_semicolon_press_time = currentTime
+			end
+		end,
+		nil,
+		function()
+			-- key repeat: behave like single press repeat
+			if isShiftPressed() then
+				hs.eventtap.keyStroke({ "shift" }, "right", 0)
+			else
+				hs.eventtap.keyStroke(nil, "right", 0)
 			end
 		end
 	)
@@ -197,7 +203,7 @@ function keyMappings.init()
 	table.insert(hotkeyGroups, scrollUp)
 	table.insert(hotkeyGroups, scrollDown)
 	table.insert(hotkeyGroups, cmdJHotkey)
-	table.insert(hotkeyGroups, cmdKHotkey)
+	table.insert(hotkeyGroups, cmdSemicolonHotkey)
 	table.insert(hotkeyGroups, cmdSlashHotkey)
 	table.insert(hotkeyGroups, cmdPeriodHotkey)
 
