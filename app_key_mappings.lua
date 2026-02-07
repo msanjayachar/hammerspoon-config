@@ -3,14 +3,6 @@
 local hs = hs
 
 local leaderKeys = {}
-local windowIndexMap = {}
-local windowSelectionMode = false
-local windowSelectionMap = {
-	a = "1",
-	s = "2",
-	d = "3",
-	f = "4",
-}
 
 local appMappings = {
 	["c"] = { name = "Google Chrome", bundleID = "com.google.Chrome" },
@@ -40,13 +32,10 @@ local appMappings = {
 	},
 }
 
-local leaderState = false
 local leaderSequence = ""
+local leaderState = false
 local leaderTimer = nil
 local sequenceTimeout = 0.4 -- seconds
-
-local windowSelectionTimeout = 0.6
-local windowSelectionTimer = nil
 
 local function resetLeader()
 	leaderState = false
@@ -185,72 +174,6 @@ local function performAction(sequence)
 			return win:title() ~= "" and not win:isMinimized() and win:isVisible()
 		end)
 
-		-- First, try to unminimize if all windows are minimized
-		local allMinimized = hs.fnutils.every(windows, function(win)
-			return win:isMinimized()
-		end)
-
-		if allMinimized and #windows > 0 then
-			print("All windows minimized, unminimizing first window")
-			local win = windows[1]
-			hs.timer.doAfter(0.1, function()
-				moveCursorToCenter(win)
-			end)
-			return
-		end
-
-		if windows and #windows > 0 then
-			table.sort(windows, function(a, b)
-				return a:id() < b:id()
-			end)
-			if #currentAppWindows == 2 then
-				print("hello from currentAppWindows == 2")
-				local currentWin = hs.window.focusedWindow()
-				local nextWin = (currentWin:id() == currentAppWindows[1]:id()) and currentAppWindows[2]
-					or currentAppWindows[1]
-				print("nextWin: ", nextWin)
-				nextWin:focus()
-				moveCursorToCenter(nextWin)
-				resetLeader()
-				return
-			elseif #currentAppWindows > 2 then
-				print("hello from > 2 windows")
-				windowIndexMap = {}
-				for index, win in ipairs(currentAppWindows) do
-					if index > 4 then
-						break
-					end
-					windowIndexMap[tostring(index)] = win
-				end
-				windowSelectionMode = true
-				windowSelectionTimer = hs.timer.doAfter(windowSelectionTimeout, function()
-					windowSelectionMode = false
-					hs.alert.show("Window selection timed out")
-				end)
-				local promptLines = { "Select window:" }
-				local count = 0
-				for key, indexStr in pairs(windowSelectionMap) do
-					local win = currentAppWindows[tonumber(indexStr)]
-					if win then
-						count = count + 1
-						local title = win:title() or "Untitled"
-						title = title:match("%S") and title or "[No Title]"
-						title = title:sub(1, 60)
-						table.insert(promptLines, string.format("  %s (%d): %s", key, indexStr, title))
-					end
-				end
-				if #promptLines > 1 then
-					hs.alert.show(table.concat(promptLines, "\n"))
-				end
-			end
-		end
-
-		-- Log window count and details
-		print("Found " .. #windows .. " windows for " .. appName)
-		for i, win in ipairs(windows) do
-			print("  Window " .. i .. ": " .. win:title() .. " (ID: " .. win:id() .. ")")
-		end
-
 		local validWindows = hs.fnutils.filter(windows, function(win)
 			return win:title() ~= "" and not win:isMinimized()
 		end)
@@ -347,9 +270,8 @@ local function performAction(sequence)
 		else
 			local windows = targetApp:allWindows()
 			if #windows == 0 then
-				hs.alert.show(appName .. " had no windows. ")
-				targetApp:kill()
-				hs.alert.show(appName .. " killed. ")
+				targetApp:activate()
+				resetLeader()
 				return
 			end
 
@@ -401,37 +323,6 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 	end
 
 	if leaderState then
-		if windowSelectionMode then
-			if windowSelectionTimer then
-				windowSelectionTimer:stop()
-				windowSelectionTimer = nil
-			end
-
-			local idx = windowSelectionMap[key]
-			local win = idx and windowIndexMap[idx]
-			if win then
-				local spaceID = getWindowSpace(win)
-				if spaceID and spaceID ~= hs.spaces.focusedSpace() then
-					hs.spaces.gotoSpace(spaceID)
-					hs.timer.doAfter(0.3, function()
-						win:focus()
-						moveCursorToCenter(win)
-						resetLeader()
-						windowSelectionMode = false
-					end)
-				else
-					win:focus()
-					moveCursorToCenter(win)
-					resetLeader()
-					windowSelectionMode = false
-				end
-			else
-				hs.alert.show("Invalid selection")
-				resetLeader()
-				windowSelectionMode = false
-			end
-			return true
-		end
 		-- Reset timer on every keystroke
 		if leaderTimer then
 			leaderTimer:stop()
@@ -445,23 +336,6 @@ local eventTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(e
 				return true
 			end
 			return true
-		elseif key and windowIndexMap[key] then
-			local win = windowIndexMap[key]
-			if win then
-				local spaceID = getWindowSpace(win)
-				if spaceID and spaceID ~= hs.spaces.focusedSpace() then
-					hs.spaces.gotoSpace(spaceID)
-					hs.timer.doAfter(0.3, function()
-						win:focus()
-						moveCursorToCenter(win)
-						resetLeader()
-					end)
-				else
-					win:focus()
-					moveCursorToCenter(win)
-					resetLeader()
-				end
-			end
 		else
 			resetLeader()
 			return false
