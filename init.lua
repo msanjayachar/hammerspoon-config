@@ -4,7 +4,7 @@ local hs = hs
 
 -- Load modules
 local keyMappings = require("key_mappings")
-local leaderKeys = require("chromium_excalidraw")
+local leaderKeys = require("app_key_mappings")
 local alertTimer = require("alert_timer")
 local shrink = require("shrink_all")
 shrink.bind()
