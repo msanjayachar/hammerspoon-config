@@ -32,10 +32,16 @@ local KEYMAP = {
 	{ "leftCmd+leftShift", "h", "cmd+shift", "left" },
 
 	-- keep k in KEYMAP for moving down (unchanged)
-	{ "leftCmd", "k", nil, "down" },
-	{ "leftCmd+leftShift", "k", "cmd+shift", "down" },
-	{ "leftCmd+rightShift", "k", "shift", "down" },
-	{ "leftCmd+leftShift+rightShift", "k", "shift", "down" },
+	-- { "leftCmd", "k", nil, "down" },
+	-- { "leftCmd+leftShift", "k", "cmd+shift", "down" },
+	-- { "leftCmd+rightShift", "k", "shift", "down" },
+	-- { "leftCmd+leftShift+rightShift", "k", "shift", "down" },
+
+	-- repalce K with J
+	{ "leftCmd", "j", nil, "down" },
+	{ "leftCmd+leftShift", "j", "cmd+shift", "down" },
+	{ "leftCmd+rightShift", "j", "shift", "down" },
+	{ "leftCmd+leftShift+rightShift", "j", "shift", "down" },
 
 	-- Make Cmd+; act like Right (one char). Shift+Cmd+; -> Shift+Right (select right)
 	{ "leftCmd", ";", nil, "right" },
